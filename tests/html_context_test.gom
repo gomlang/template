@@ -1,0 +1,146 @@
+package tests;
+
+use ecosystem::template;
+use ecosystem::template::{Engine, ErrorKind, Options, Value};
+use std::testing;
+
+fn html_engine() -> Engine {
+    testing::expect_ok(Engine::new(Options::standard()), "HTML template engine")
+}
+
+fn html_context(value: string) -> Value {
+    Value::Object(Vec::from_array([("x", Value::Text(value))]))
+}
+
+fn html_render(source: string, value: string) -> string {
+    testing::expect_ok(html_engine().render_html_string(source, html_context(value)), "HTML render")
+}
+
+#[test]
+fn contextual_html_text_attributes_and_urls() -> () {
+    testing::assert_eq(html_render("<p>{{x}}</p>", "<&'\""), "<p>&lt;&amp;&#39;&#34;</p>");
+    testing::assert_eq(html_render("1 < 2; {{x}}", "<"), "1 < 2; &lt;");
+    testing::assert_eq(
+        html_render("<p title=\"{{x}}\">x</p>", "a\" < b"),
+        "<p title=\"a&#34; &lt; b\">x</p>",
+    );
+    testing::assert_eq(
+        html_render("<p title={{x}}>x</p>", "a b=c`d"),
+        "<p title=a&#32;b&#61;c&#96;d>x</p>",
+    );
+    testing::assert_eq(
+        html_render("<a href=\"{{x}}\">x</a>", "https://example.test/?a=1&b=2"),
+        "<a href=\"https://example.test/?a=1&amp;b=2\">x</a>",
+    );
+    testing::assert_eq(
+        html_render("<a href=\"/user/{{x}}\">x</a>", "a/b?x=<"),
+        "<a href=\"/user/a%2Fb%3Fx%3D%3C\">x</a>",
+    );
+}
+
+#[test]
+fn contextual_script_style_and_trust_markers() -> () {
+    testing::assert_eq(
+        html_render("<script>let x={{x}};</script>", "</script><img src=x>"),
+        "<script>let x=\"\\u003c\\u002fscript\\u003e\\u003cimg src=x\\u003e\";</script>",
+    );
+    testing::assert_eq(
+        html_render("<script/>{{x}}</script>", "alert(1)"),
+        "<script/>\"alert(1)\"</script>",
+    );
+    testing::assert_eq(
+        html_render("<style>.x{content:{{x}}}</style>", "</style>"),
+        "<style>.x{content:\"\\3c \\2f style\\3e \"}</style>",
+    );
+    testing::assert_eq(
+        html_render("<style/>.x{content:{{x}}}</style>", "</style>"),
+        "<style/>.x{content:\"\\3c \\2f style\\3e \"}</style>",
+    );
+    testing::assert_eq(html_render("{{x|safe}}", "<b>"), "&lt;b&gt;");
+    testing::assert_eq(
+        html_render("{% autoescape false %}{{x}}{% endautoescape %}", "<b>"),
+        "&lt;b&gt;",
+    );
+}
+
+#[test]
+fn contextual_rejects_unsafe_or_ambiguous_positions() -> () {
+    for source in["<a href=\"{{x}}\">x</a>", "<img src=\"{{x}}\">"] {
+        for value in["javascript:alert(1)", "data:text/html,boom", " javaScript:alert(1)"] {
+            let error = testing::expect_err(
+                html_engine().render_html_string(source, html_context(value)),
+                "unsafe URL",
+            );
+            testing::assert_eq(error.kind, ErrorKind::Type);
+        }
+    }
+    for (source, value) in[
+        ("<a href=\"{{x}}:alert(1)\">x</a>", "javascript"),
+        ("<a href=\"java{{x}}:alert(1)\">x</a>", "script"),
+    ] {
+        let error = testing::expect_err(
+            html_engine().render_html_string(source, html_context(value)),
+            "assembled unsafe URL",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Type);
+    }
+    for source in[
+        "<{{x}}>bad</p>",
+        "<p {{x}}=v></p>",
+        "<!-- {{x}} -->",
+        "<p onclick=\"{{x}}\"></p>",
+        "<p style=\"{{x}}\"></p>",
+        "<p srcset=\"{{x}}\"></p>",
+        "<iframe srcdoc=\"{{x}}\"></iframe>",
+        "<meta content=\"{{x}}\">",
+        "<script>let x='{{x}}';</script>",
+        "<style>.x{content:'{{x}}'}</style>",
+    ] {
+        let error = testing::expect_err(
+            html_engine().render_html_string(source, html_context("<unsafe>")),
+            "unsupported HTML context",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Type);
+    }
+    let error = testing::expect_err(
+        html_engine().render_html_string("<a href=\"{{x}}", html_context("/ok")),
+        "unfinished HTML",
+    );
+    testing::assert_eq(error.kind, ErrorKind::Syntax);
+}
+
+#[test]
+fn contextual_includes_follow_the_actual_output_context() -> () {
+    let engine = html_engine();
+    testing::expect_ok(engine.add("child", "{{x}}"), "add child");
+    testing::expect_ok(
+        engine.add("page", "<a href=\"/user/{% include 'child' %}\">x</a>"),
+        "add page",
+    );
+    testing::assert_eq(
+        testing::expect_ok(engine.render_html("page", html_context("a/b")), "include URL"),
+        "<a href=\"/user/a%2Fb\">x</a>",
+    );
+    testing::assert_eq(
+        html_render(
+            "<a {% if true %}href=\"/user/{{x}}\"{% else %}title=\"{{x}}\"{% endif %}>x</a>",
+            "a/b",
+        ),
+        "<a href=\"/user/a%2Fb\">x</a>",
+    );
+}
+
+#[test]
+fn contextual_expansion_respects_output_limit() -> () {
+    let options = Options {
+        strict_undefined: true,
+        autoescape: true,
+        limits: template::Limits { max_output_bytes: 32, ..template::Limits::standard() },
+    };
+    let engine = testing::expect_ok(Engine::new(options), "limited HTML engine");
+    let error = testing::expect_err(
+        engine.render_html_string("<p title=\"{{x}}\"></p>", html_context("&&&&&&&&")),
+        "attribute expansion limit",
+    );
+    testing::assert_eq(error.kind, ErrorKind::Limit);
+}
