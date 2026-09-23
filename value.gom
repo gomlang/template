@@ -109,11 +109,16 @@ pub fn from_serializable[T: Serialize](value: T) -> Result[Value, Error] {
 struct Output {
     bytes: Vec[u8],
     limit: isize,
+    html: Option[Ref[HtmlContext]],
 }
 
 impl Output {
     fn new(limit: isize) -> Output {
-        Output { bytes: Vec::new(), limit }
+        Output { bytes: Vec::new(), limit, html: Option::None }
+    }
+
+    fn html(limit: isize) -> Output {
+        Output { bytes: Vec::new(), limit, html: Option::Some(Ref::new(HtmlContext::new())) }
     }
 
     fn append(self: Output, value: string, source: Source, offset: isize) -> Result[(), Error] {

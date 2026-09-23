@@ -40,6 +40,7 @@ fn page() -> Result[string, template::Error] {
 | `contains(name)`, `remove(name)` | Inspect/invalidate cached templates; remove reports whether one existed |
 | `render(name, context)` | Load and render a named template |
 | `render_string(source, context)` | Compile and render an unnamed source without adding it to the cache |
+| `render_html(name, context)`, `render_html_string(source, context)`, `render_html_template(template, context)` | Render with contextual HTML escaping |
 | `compile(name, source)`, `compile_with_limits(name, source, limits)` | Create a reusable `Template` with private AST |
 | `render_template(template, context)` | Render an already compiled template |
 | `Template::name()` | Return its diagnostic name |
@@ -48,9 +49,30 @@ fn page() -> Result[string, template::Error] {
 | `set_loader(Loader)` | Register `(string) -> Result[Option[string], string]` for cache misses |
 | `escape_html(string)` | Escape an individual string under the standard output limit |
 
-HTML escaping mechanics are supplied by `ecosystem::html`. The existing wrapper
-retains numeric quote references, byte limits and source-aware template errors;
-this dependency does not add contextual JavaScript/CSS/URL safety analysis.
+HTML text escaping mechanics are supplied by `ecosystem::html`. The original
+`render` methods retain their existing Jinja-style behavior. Choose a
+`render_html` method when the result will be inserted into an HTML document.
+The engine tracks literal template output across branches and includes. It
+escapes dynamic values as HTML text, quoted or unquoted attribute data, URL data,
+JavaScript JSON values in `<script>`, or CSS quoted strings in `<style>`.
+
+URL-valued attributes (`href`, `src`, `action`, `formaction`, `poster`, `cite`,
+`background`, `data`, and `xlink:href`) accept relative references and the
+`http`, `https`, `mailto`, and `tel` schemes. A value interpolated after a
+literal URL prefix is percent-encoded as a component. The completed attribute
+is checked too, so a later literal suffix cannot assemble a forbidden scheme.
+Whitespace, controls, backslashes, character references in the scheme, and
+other schemes are rejected. Dynamic tag and attribute names, comments, event
+handler/style/srcset/srcdoc/http-equiv/content attributes, and interpolation
+inside JavaScript or CSS strings and comments return source-located errors.
+Unfinished HTML tags, comments, script and style elements also fail.
+
+Contextual rendering escapes every dynamic value, including `Safe` values and
+values inside `{% autoescape false %}`. Static markup is application-authored;
+contextual rendering does not sanitize it or parse arbitrary HTML input. It
+does not support every browser language or active-content attribute. Use
+ordinary data values in supported positions and keep application-authored
+script and style syntax explicit.
 
 A loader returns `None` for a missing template and `Err` for an actual loading
 failure. Successfully compiled loads are cached by name. Invalidate them with
@@ -248,7 +270,7 @@ From the repository root:
 just ecosystem-test template
 ```
 
-There are 11 external library tests and 3 independently resolved consumer tests.
+There are 16 external library tests and 4 independently resolved consumer tests.
 They cover grammar, scopes, generic Serde context conversion, captured callbacks,
 inheritance, loaders, cache replacement, safety propagation, malformed inputs,
 numeric boundaries, cycles and limits. The consumer is built and run separately;

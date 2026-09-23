@@ -84,6 +84,26 @@ impl Engine {
         string,
         Error,
     ] {
+        self.render_template_mode(template, context, false)
+    }
+
+    pub fn render_html(self: Engine, name: string, context: Value) -> Result[string, Error] {
+        let source = Source { name, text: "" };
+        let template = self.load(name, source, 0)?;
+        self.render_html_template(template, context)
+    }
+
+    pub fn render_html_template(self: Engine, template: Template, context: Value) -> Result[
+        string,
+        Error,
+    ] {
+        self.render_template_mode(template, context, true)
+    }
+
+    fn render_template_mode(self: Engine, template: Template, context: Value, contextual: bool) -> Result[
+        string,
+        Error,
+    ] {
         let runtime = Runtime {
             engine: self,
             scopes: Vec::from_array([HashMap::new()]),
@@ -92,13 +112,25 @@ impl Engine {
         };
         let context = runtime.snapshot(context, template.source, 0, 0)?;
         runtime.bind_context(context, template.source, 0)?;
-        let output = Output::new(self.options.limits.max_output_bytes);
+        let output = if contextual {
+            Output::html(self.options.limits.max_output_bytes)
+        } else {
+            Output::new(self.options.limits.max_output_bytes)
+        };
         runtime.render(template, output, self.options.autoescape, 0)?;
+        output.finish_html(template.source)?;
         Result::Ok(output.finish())
     }
 
     pub fn render_string(self: Engine, source: string, context: Value) -> Result[string, Error] {
         self.render_template(compile_with_limits("<string>", source, self.options.limits)?, context)
+    }
+
+    pub fn render_html_string(self: Engine, source: string, context: Value) -> Result[string, Error] {
+        self.render_html_template(
+            compile_with_limits("<string>", source, self.options.limits)?,
+            context,
+        )
     }
 }
 
@@ -371,30 +403,39 @@ impl Runtime {
         for node in nodes {
             self.tick(source, node.offset, depth)?;
             match node.kind {
-                NodeKind::Text(value) => output.append(value, source, node.offset)?,
+                NodeKind::Text(value) => output.append_literal(value, source, node.offset)?,
                 NodeKind::Print(expression) => {
                     let value = self.eval(expression, source, world, autoescape, depth + 1)?;
                     let text = self.display(value, source, expression.offset)?;
-                    output.append(
-                        if autoescape && !is_safe(value) {
-                            escaped(text, output.limit, source, expression.offset)?
-                        } else {
-                            text
-                        },
-                        source,
-                        expression.offset,
-                    )?;
+                    if output.html.is_some() {
+                        output.append_contextual(value, text, self, source, expression.offset)?;
+                    } else {
+                        output.append(
+                            if autoescape && !is_safe(value) {
+                                escaped(text, output.limit, source, expression.offset)?
+                            } else {
+                                text
+                            },
+                            source,
+                            expression.offset,
+                        )?;
+                    }
                 },
                 NodeKind::Set(name, expression) => {
                     let value = self.eval(expression, source, world, autoescape, depth + 1)?;
                     self.set(name, value);
                 },
                 NodeKind::Capture(name, body) => {
-                    let capture = Output::new(output.limit);
+                    let capture = if output.html.is_some() {
+                        Output::html(output.limit)
+                    } else {
+                        Output::new(output.limit)
+                    };
                     self.nodes(body, source, world, capture, autoescape, depth + 1)?;
+                    capture.finish_html(source)?;
                     self.set(
                         name,
-                        if autoescape {
+                        if autoescape && output.html.is_none() {
                             Value::Safe(capture.finish())
                         } else {
                             Value::Text(capture.finish())
