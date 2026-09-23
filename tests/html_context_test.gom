@@ -1,0 +1,25 @@
+package tests;
+
+use ecosystem::template;
+use std::testing;
+
+#[test]
+fn contextual_html_consumer_url_and_script() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    testing::expect_ok(
+        engine.add("page", "<a href=\"{{url}}\">{{label}}</a><script>let x={{label}};</script>"),
+        "page",
+    );
+    let context = template::Value::Object(
+        Vec::from_array(
+            [
+                ("url", template::Value::Text("https://example.test/?a=1&b=2")),
+                ("label", template::Value::Safe("</script><b>")),
+            ],
+        ),
+    );
+    testing::assert_eq(
+        testing::expect_ok(engine.render_html("page", context), "contextual render"),
+        "<a href=\"https://example.test/?a=1&amp;b=2\">&lt;/script&gt;&lt;b&gt;</a><script>let x=\"\\u003c\\u002fscript\\u003e\\u003cb\\u003e\";</script>",
+    );
+}
