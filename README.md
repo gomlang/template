@@ -12,7 +12,7 @@ cover the shared syntax; they do not establish full Jinja compatibility.
 
 ## Example and public API
 
-```gom
+```goml
 use ecosystem::template;
 use std::serde::{Serialize};
 
@@ -288,7 +288,7 @@ GoML, with no Python interpreter or reference packages. Logs are retained under
 
 ## Development and examples
 
-Requires GoML 0.1.55 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
