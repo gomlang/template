@@ -497,21 +497,8 @@ impl Runtime {
         }
         if name == "tojson" {
             arity(name, arguments.len(), 0, 0, source, offset)?;
-            let text = json_text(value, self, source, offset)?;
             let output = Output::new(self.engine.options.limits.max_output_bytes);
-            for scalar in text.chars() {
-                output.append(
-                    match scalar {
-                        '<' => "\\u003c",
-                        '>' => "\\u003e",
-                        '&' => "\\u0026",
-                        '\'' => "\\u0027",
-                        _ => scalar.to_string(),
-                    },
-                    source,
-                    offset,
-                )?;
-            }
+            write_json(value, output, self, source, offset, 0, true)?;
             return Result::Ok(Value::Safe(output.finish()))
         }
         if name == "urlencode" {

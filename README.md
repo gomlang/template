@@ -110,7 +110,10 @@ Direct `Value` contexts use the engine's configured limits when rendered.
 Output displays integers and finite floats as numbers, booleans as `true` or
 `false`, null as an empty string, and lists/objects as compact JSON. Safe strings
 contain explicitly trusted HTML. Collections are written through a bounded JSON
-emitter instead of first creating one unbounded serialized string.
+emitter instead of first creating one unbounded serialized string. String values
+and object keys emit checked literal runs and small escape fragments; control-heavy
+strings cannot allocate their complete expanded JSON before the budget check.
+`tojson` applies its HTML-sensitive escapes during that same traversal.
 
 By default, using an undefined value in output, a condition, a loop or a
 comparison fails. Missing attributes/indices can propagate through further
@@ -277,7 +280,7 @@ From the repository root:
 (cd ../verification && just ecosystem-test template)
 ```
 
-There are 18 external library tests and 5 example tests, also checked independently by `goml verify`.
+There are 19 external library tests and 6 example tests, also checked independently by `goml verify`.
 They cover grammar, scopes, generic Serde context conversion, captured callbacks,
 inheritance, loaders, cache replacement, safety propagation, malformed inputs,
 numeric boundaries, cycles and limits. The example is built and run separately;

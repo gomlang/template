@@ -187,6 +187,44 @@ fn to_float(value: Value) -> Option[f64] {
     }
 }
 
+fn write_json_string(value: string, output: Output, html_safe: bool, source: Source, offset: isize) -> Result[
+    (),
+    Error,
+] {
+    output.append("\"", source, offset)?;
+    let mut start = 0;
+    for index in 0..value.byte_len() {
+        let byte = value.byte_get(index);
+        let replacement = if html_safe {
+            match byte {
+                b'<' => "\\u003c",
+                b'>' => "\\u003e",
+                b'&' => "\\u0026",
+                b'\'' => "\\u0027",
+                _ => "",
+            }
+        } else {
+            ""
+        };
+        if replacement != "" || byte < b' ' || byte == b'"' || byte == b'\\' {
+            if start < index {
+                output.append(value.byte_slice(start, index), source, offset)?;
+            }
+            if replacement != "" {
+                output.append(replacement, source, offset)?;
+            } else {
+                let encoded = json::encode(json::Value::String(value.byte_slice(index, index + 1)));
+                output.append(encoded.byte_slice(1, encoded.byte_len() - 1), source, offset)?;
+            }
+            start = index + 1;
+        }
+    }
+    if start < value.byte_len() {
+        output.append(value.byte_slice(start, value.byte_len()), source, offset)?;
+    }
+    output.append("\"", source, offset)
+}
+
 fn write_json(
     value: Value,
     output: Output,
@@ -194,6 +232,7 @@ fn write_json(
     source: Source,
     offset: isize,
     depth: isize,
+    html_safe: bool,
 ) -> Result[(), Error] {
     runtime.tick(source, offset, depth)?;
     match value {
@@ -204,8 +243,10 @@ fn write_json(
         Value::Bool(value) => output.append(value.to_string(), source, offset)?,
         Value::Int(value) => output.append(value.to_string(), source, offset)?,
         Value::Float(value) => output.append(value.to_string(), source, offset)?,
-        Value::Text(value) | Value::Safe(value) => output.append(
-            json::encode(json::Value::String(value)),
+        Value::Text(value) | Value::Safe(value) => write_json_string(
+            value,
+            output,
+            html_safe,
             source,
             offset,
         )?,
@@ -215,7 +256,7 @@ fn write_json(
                 if index > 0 {
                     output.append(",", source, offset)?;
                 }
-                write_json(items[index], output, runtime, source, offset, depth + 1)?;
+                write_json(items[index], output, runtime, source, offset, depth + 1, html_safe)?;
             }
             output.append("]", source, offset)?;
         },
@@ -225,9 +266,9 @@ fn write_json(
                 if index > 0 {
                     output.append(",", source, offset)?;
                 }
-                output.append(json::encode(json::Value::String(fields[index].0)), source, offset)?;
+                write_json_string(fields[index].0, output, html_safe, source, offset)?;
                 output.append(":", source, offset)?;
-                write_json(fields[index].1, output, runtime, source, offset, depth + 1)?;
+                write_json(fields[index].1, output, runtime, source, offset, depth + 1, html_safe)?;
             }
             output.append("}", source, offset)?;
         },
@@ -237,7 +278,7 @@ fn write_json(
 
 fn json_text(value: Value, runtime: Runtime, source: Source, offset: isize) -> Result[string, Error] {
     let output = Output::new(runtime.engine.options.limits.max_output_bytes);
-    write_json(value, output, runtime, source, offset, 0)?;
+    write_json(value, output, runtime, source, offset, 0, false)?;
     Result::Ok(output.finish())
 }
 
