@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::template as example;
+use ecosystem::template::examples::basic as example;
 use ecosystem::template;
 use std::testing;
 
