@@ -1,0 +1,54 @@
+package tests;
+
+use ecosystem::template;
+use ecosystem::template::{Value, Options, Engine, Limits};
+use std::json;
+use std::testing;
+
+#[test]
+fn json_strings_keys_and_html_escapes_keep_exact_budget_boundaries() -> () {
+    let controls = "\u0000\b\t\n\f\r\"\\<>&'界🙂";
+    let value = Value::Object(Vec::from_array([(controls, Value::Text(controls))]));
+    let context = Value::Object(Vec::from_array([("value", value)]));
+    let plain = json::encode(
+        json::object(Vec::from_array([(controls, json::Value::String(controls))])),
+    );
+    let safe = plain.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026").replace(
+        "'",
+        "\\u0027",
+    );
+    for (source, expected) in[("{{ value }}", plain), ("{{ value|tojson }}", safe)] {
+        for extra in[-1, 0, 1] {
+            let options = Options {
+                autoescape: false,
+                limits: Limits {
+                    max_output_bytes: expected.byte_len() + extra,
+                    ..Limits::standard(),
+                },
+                ..Options::standard(),
+            };
+            let engine = testing::expect_ok(Engine::new(options), "engine");
+            let result = engine.render_string(source, context);
+            if extra < 0 {
+                testing::assert_err(result);
+            } else {
+                testing::assert_eq(testing::expect_ok(result, "JSON output"), expected);
+            }
+        }
+    }
+    let small = testing::expect_ok(
+        Engine::new(
+            Options {
+                limits: Limits { max_output_bytes: 64, ..Limits::standard() },
+                ..Options::standard(),
+            },
+        ),
+        "small engine",
+    );
+    testing::assert_err(
+        small.render_string(
+            "{{ value|tojson }}",
+            Value::Object(Vec::from_array([("value", Value::Text("\u0000".repeat(100000)))])),
+        ),
+    );
+}
