@@ -277,7 +277,7 @@ From the repository root:
 (cd ../verification && just ecosystem-test template)
 ```
 
-There are 16 external library tests and 4 example tests, also checked independently by `goml verify`.
+There are 18 external library tests and 5 example tests, also checked independently by `goml verify`.
 They cover grammar, scopes, generic Serde context conversion, captured callbacks,
 inheritance, loaders, cache replacement, safety propagation, malformed inputs,
 numeric boundaries, cycles and limits. The example is built and run separately;
