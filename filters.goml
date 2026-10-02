@@ -35,14 +35,55 @@ fn int_argument(value: Value, source: Source, offset: isize) -> Result[i64, Erro
 }
 
 impl Runtime {
-    fn sorted(self: Runtime, values: Vec[Value], reverse: bool, source: Source, offset: isize) -> Result[
-        Vec[Value],
-        Error,
-    ] {
-        let mut items = values.copy();
+    fn sorted(
+        self: Runtime,
+        values: Vec[Value],
+        reverse: bool,
+        attribute: Option[string],
+        source: Source,
+        offset: isize,
+    ) -> Result[Vec[Value], Error] {
+        let mut items: Vec[(Value, Value)] = Vec::with_capacity(values.len());
+        let path = match attribute {
+            Some(path) => path.split("."),
+            None => Vec::new(),
+        };
+        for part in path {
+            if part == "" {
+                return Result::Err(
+                    problem(
+                        source,
+                        offset,
+                        ErrorKind::Type,
+                        "sort attribute path must not contain empty components",
+                    ),
+                )
+            }
+        }
+        for value in values {
+            let mut key = value;
+            for part in path {
+                self.tick(source, offset, 0)?;
+                key = key.get(part);
+            }
+            if attribute.is_some() {
+                if let Value::Undefined(name) = key {
+                    return Result::Err(
+                        problem(
+                            source,
+                            offset,
+                            ErrorKind::Undefined,
+                            f"undefined sort attribute {name}",
+                        ),
+                    )
+                }
+                let _ = self.order(key, key, source, offset)?;
+            }
+            items.push((key, value));
+        }
         let mut width = 1;
         while width < items.len() {
-            let result: Vec[Value] = Vec::with_capacity(items.len());
+            let result: Vec[(Value, Value)] = Vec::with_capacity(items.len());
             let mut start = 0;
             while start < items.len() {
                 let middle = if width > items.len() - start {
@@ -63,7 +104,7 @@ impl Runtime {
                     } else if left == middle {
                         false
                     } else {
-                        let order = self.order(items[left], items[right], source, offset)?;
+                        let order = self.order(items[left].0, items[right].0, source, offset)?;
                         if reverse {
                             order >= 0
                         } else {
@@ -83,7 +124,11 @@ impl Runtime {
             items = result;
             width *= 2;
         }
-        Result::Ok(items)
+        let result = Vec::with_capacity(items.len());
+        for (_, value) in items {
+            result.push(value);
+        }
+        Result::Ok(result)
     }
 
     fn call_builtin(
@@ -497,15 +542,26 @@ impl Runtime {
             return Result::Ok(Value::Text(output.finish()))
         }
         if name == "sort" {
-            arity(name, arguments.len(), 0, 1, source, offset)?;
+            arity(name, arguments.len(), 0, 2, source, offset)?;
             let reverse = if arguments.is_empty() {
                 false
             } else {
                 self.truth(arguments[0], source, offset)?
             };
+            let attribute = if arguments.len() == 2 {
+                Option::Some(text_argument(arguments[1], source, offset)?)
+            } else {
+                Option::None
+            };
             return Result::Ok(
                 Value::List(
-                    self.sorted(self.sequence(value, source, offset)?, reverse, source, offset)?,
+                    self.sorted(
+                        self.sequence(value, source, offset)?,
+                        reverse,
+                        attribute,
+                        source,
+                        offset,
+                    )?,
                 ),
             )
         }

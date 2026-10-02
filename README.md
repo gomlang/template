@@ -209,7 +209,7 @@ Functions are `range(stop)`, `range(start, stop[, step])`, `len`, `str`, `bool`,
 | Missing values | `default([fallback[, boolean]])`, alias `d` |
 | HTML | `escape` / `e`, `safe`, `forceescape` |
 | Text | `upper`, `lower`, `trim`, `capitalize`, `length` / `count`, `replace(old, new[, count])`, `urlencode` |
-| Collections | `join([separator])`, `first`, `last`, `reverse`, `list`, `sort([reverse])`, `unique`, `batch(size[, fill])` |
+| Collections | `join([separator])`, `first`, `last`, `reverse`, `list`, `sort([reverse[, attribute]])`, `unique`, `batch(size[, fill])` |
 | Mappings | `items`, `keys`, `values`, `map('attribute.path')`, `selectattr('attribute.path')`, `rejectattr('attribute.path')` |
 | Selection | `select`, `reject`, using truth values |
 | Numbers | `int`, `float`, `abs`, `round`, `sum`, `min`, `max` |
@@ -219,7 +219,14 @@ Filters check arity and argument types. `default` substitutes only undefined
 values unless its second argument is true. Numeric conversions are strict;
 invalid text fails instead of silently becoming zero. `round` uses the standard
 library's rounding to nearest, with halves away from zero. `sort` is stable and
-case-sensitive; `unique` retains the first structurally equal value. Attribute
+case-sensitive. `sort(false, 'profile.rank')` sorts objects by a dot-separated
+attribute path, evaluating each key once and preserving the input order of equal
+keys even in reverse order. Keys must be numbers or strings; missing attributes
+fail even in non-strict mode, and empty path components fail. Sorting leaves the
+input collection unchanged. Key traversal and comparisons use the operation
+budget; the stable merge sort takes O(n log n) comparisons and O(n) extra storage.
+Its positional signature follows this dialect rather than Jinja's keyword-based
+sort signature. `unique` retains the first structurally equal value. Attribute
 filters use positional path strings. Casing follows `std::unicode`, including
 its Unicode version and simple-case behavior.
 
