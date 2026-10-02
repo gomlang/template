@@ -25,3 +25,16 @@ fn reusable_compiled_template_keeps_render_scopes_separate() -> () {
     }
     testing::assert(context.get("x").as_int() == Option::Some(1));
 }
+
+#[test]
+fn downstream_sort_by_attribute() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    let source = "{% for row in [{'name':'B','rank':2},{'name':'A','rank':1}]|sort(false, 'rank') %}{{row.name}}{% endfor %}";
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(source, template::Value::Object(Vec::new())),
+            "attribute sort",
+        ),
+        "AB",
+    );
+}

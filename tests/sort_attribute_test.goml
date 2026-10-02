@@ -1,0 +1,59 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn stable_attribute_sort_preserves_items_and_handles_nested_keys() -> () {
+    let source = "{{ rows|sort(false, 'profile.rank')|map('id')|join(',') }}|{{ rows|sort(true, 'profile.rank')|map('id')|join(',') }}|{{ rows|map('id')|join(',') }}";
+    check(
+        source,
+        "{\"rows\":[{\"id\":\"a\",\"profile\":{\"rank\":2}},{\"id\":\"b\",\"profile\":{\"rank\":1}},{\"id\":\"c\",\"profile\":{\"rank\":2.0}}]}",
+        "b,a,c|a,c,b|a,b,c",
+    );
+    check(
+        "{{ xs|sort(false, 'name')|map('name')|join(',') }}",
+        "{\"xs\":[{\"name\":\"中\"},{\"name\":\"a\"},{\"name\":\"A\"}]}",
+        "A,a,中",
+    );
+    check("{{ []|sort(false, 'rank')|length }}", "{}", "0");
+}
+
+#[test]
+fn attribute_sort_checks_paths_keys_and_operation_budget() -> () {
+    for source in[
+        "{{ [{}]|sort(false, 'missing') }}",
+        "{{ [{'rank':null}]|sort(false, 'rank') }}",
+        "{{ []|sort(false, '') }}",
+        "{{ []|sort(false, 'a..b') }}",
+        "{{ []|sort(false, 1) }}",
+        "{{ [{'rank':1},{'rank':'x'}]|sort(false, 'rank') }}",
+    ] {
+        testing::assert_err(engine().render_string(source, Value::Object(Vec::new())));
+    }
+    let permissive = testing::expect_ok(
+        Engine::new(Options { strict_undefined: false, ..Options::standard() }),
+        "engine",
+    );
+    let error = testing::expect_err(
+        permissive.render_string("{{ [{}]|sort(false, 'rank') }}", Value::Object(Vec::new())),
+        "missing key",
+    );
+    testing::assert_eq(error.kind, ErrorKind::Undefined);
+    let options = Options::standard();
+    let limited = testing::expect_ok(
+        Engine::new(
+            Options {
+                limits: ecosystem::template::Limits { max_steps: 30, ..options.limits },
+                ..options,
+            },
+        ),
+        "limited engine",
+    );
+    testing::assert_err(
+        limited.render_string(
+            "{{ [{'rank':4},{'rank':3},{'rank':2},{'rank':1}]|sort(false, 'rank') }}",
+            Value::Object(Vec::new()),
+        ),
+    );
+}
