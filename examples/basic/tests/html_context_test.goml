@@ -40,3 +40,29 @@ fn contextual_html_consumer_form_feed_keeps_raw_element_context() -> () {
         "<script\f>let x=\"alert(1)\";</script>",
     );
 }
+
+#[test]
+fn contextual_html_consumer_raw_close_with_whitespace_restores_text_escaping() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    let context = template::Value::Object(Vec::from_array([("x", template::Value::Text("a&b"))]));
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_html_string("<script></script\t><p>{{x}}</p>", context),
+            "raw closing tag with whitespace",
+        ),
+        "<script></script\t><p>a&amp;b</p>",
+    );
+}
+
+#[test]
+fn contextual_html_consumer_interpolation_breaks_partial_literal_delimiters() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    let context = template::Value::Object(Vec::from_array([("x", template::Value::Text("MARK"))]));
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_html_string("<script><{{x}}/script>{{x}}</script>", context),
+            "interpolation prevents a closing tag",
+        ),
+        "<script><\"MARK\"/script>\"MARK\"</script>",
+    );
+}

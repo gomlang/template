@@ -56,7 +56,11 @@ The engine tracks literal template output across branches and includes. It
 escapes dynamic values as HTML text, quoted or unquoted attribute data, URL data,
 JavaScript JSON values in `<script>`, or CSS quoted strings in `<style>`.
 Raw-element tag names recognize all HTML ASCII whitespace separators, including
-form feed.
+form feed. Closing script/style tags can contain whitespace, slash delimiters or
+static attributes; their tag state continues across literal chunks and includes.
+Dynamic content inside these closing tags, including partial closing tag names,
+is rejected. Raw-element state follows escaped dynamic output too, so literal
+fragments on either side of a value cannot form a nonexistent tag or comment.
 
 URL-valued attributes (`href`, `src`, `action`, `formaction`, `poster`, `cite`,
 `background`, `data`, and `xlink:href`) accept relative references and the

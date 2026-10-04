@@ -92,6 +92,35 @@ impl HtmlContext {
                 }
                 continue;
             }
+            let closing_script = state.mode == 3 && state.tail.ends_with("</script");
+            let closing_style = state.mode == 4 && state.tail.ends_with("</style");
+            if (closing_script || closing_style)
+                && (html_space(byte) || byte == b'/' || byte == b'>') {
+                state.mode = if byte == b'>' {
+                    0
+                } else {
+                    1
+                };
+                state.tag = if byte == b'>' {
+                    Vec::new()
+                } else {
+                    let prefix = if closing_script {
+                        "</script"
+                    } else {
+                        "</style"
+                    };
+                    let tag = prefix.to_bytes();
+                    tag.push(byte);
+                    tag
+                };
+                state.quote = 0;
+                state.tail = "";
+                state.raw_quote = 0;
+                state.raw_escape = false;
+                state.raw_comment = 0;
+                state.raw_previous = 0;
+                continue;
+            }
             let current = if byte < 128 {
                 char_from_u32(byte.to_u32()).unwrap_or('?').to_string().to_ascii_lowercase()
             } else {
@@ -109,15 +138,6 @@ impl HtmlContext {
                     state.mode = 0;
                     state.tail = "";
                 }
-                continue;
-            }
-            if (state.mode == 3 && state.tail.ends_with("</script>"))
-                || (state.mode == 4 && state.tail.ends_with("</style>")) {
-                state.mode = 0;
-                state.tail = "";
-                state.raw_quote = 0;
-                state.raw_comment = 0;
-                state.raw_previous = 0;
                 continue;
             }
             if state.raw_comment == 1 {
@@ -166,6 +186,20 @@ struct HtmlSlot {
 
 fn html_space(value: byte) -> bool {
     value == b' ' || value == b'\t' || value == b'\n' || value == b'\r' || value == 12
+}
+
+fn pending_raw_close(state: HtmlContext) -> bool {
+    let prefix = if state.mode == 3 {
+        "</script"
+    } else {
+        "</style"
+    };
+    for length in 2..prefix.byte_len() + 1 {
+        if state.tail.ends_with(prefix.byte_slice(0, length)) {
+            return true
+        }
+    }
+    false
 }
 
 fn html_slot(tag: string) -> Option[HtmlSlot] {
@@ -475,6 +509,16 @@ impl Output {
     ) -> Result[(), Error] {
         let context = self.html.unwrap_or(Ref::new(HtmlContext::new()));
         let state = context.get();
+        if (state.mode == 3 || state.mode == 4) && pending_raw_close(state) {
+            return Result::Err(
+                problem(
+                    source,
+                    offset,
+                    ErrorKind::Type,
+                    "dynamic HTML closing tag name is unsupported",
+                ),
+            )
+        }
         let escaped = match state.mode {
             0 => escaped(text, self.limit, source, offset)?,
             1 => {
@@ -568,6 +612,9 @@ impl Output {
                 style_escape(text, self.limit, source, offset)?
             },
         };
+        if state.mode == 3 || state.mode == 4 {
+            context.set(state.feed(escaped, self.limit, source, offset)?);
+        }
         self.append(escaped, source, offset)
     }
 

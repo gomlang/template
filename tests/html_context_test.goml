@@ -104,6 +104,126 @@ fn contextual_raw_elements_with_form_feed_keep_string_and_comment_guards() -> ()
 }
 
 #[test]
+fn contextual_raw_closing_tags_accept_html_delimiters_before_returning_to_text() -> () {
+    for (opening, name) in[
+        ("<script>", "script"),
+        ("<style>", "style"),
+        ("<ScRiPt>let value='", "ScRiPt"),
+        ("<style>/* comment", "StYlE"),
+    ] {
+        for suffix in[
+            " >",
+            "\t>",
+            "\n>",
+            "\f>",
+            "\r>",
+            "/>",
+            " data-kind='>'>",
+            " data-kind=value>",
+            "\t".repeat(80) + ">",
+        ] {
+            let literal = opening + "</" + name + suffix;
+            testing::assert_eq(
+                html_render(literal + "<p>{{x}}</p>", "a&b"),
+                literal + "<p>a&amp;b</p>",
+            );
+        }
+    }
+    for name in["scriptx", "script\u00a0", "script\u000b"] {
+        let literal = "<script></" + name + ">";
+        testing::assert_eq(
+            html_render(literal + "{{x}}</script>", "a&b"),
+            literal + "\"a\\u0026b\"</script>",
+        );
+    }
+}
+
+#[test]
+fn contextual_raw_closing_tags_track_literal_boundaries_and_reject_dynamic_tag_content() -> () {
+    let engine = html_engine();
+    testing::expect_ok(engine.add("name", "ipt"), "closing name fragment");
+    testing::expect_ok(engine.add("space", " ".repeat(80)), "closing whitespace fragment");
+    testing::expect_ok(
+        engine.add("page", "<script></scr{% include 'name' %}{% include 'space' %}><p>{{x}}</p>"),
+        "fragmented closing tag",
+    );
+    testing::assert_eq(
+        testing::expect_ok(engine.render_html("page", html_context("a&b")), "fragmented close"),
+        "<script></script" + " ".repeat(80) + "><p>a&amp;b</p>",
+    );
+    for source in[
+        "<script></script {{x}}>",
+        "<script></script data-kind='{{x}}'>",
+        "<style></style/{{x}}>",
+        "<style></style data-kind={{x}}>",
+    ] {
+        let error = testing::expect_err(
+            html_engine().render_html_string(source, html_context("value")),
+            "dynamic closing tag content",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Type);
+    }
+}
+
+#[test]
+fn contextual_raw_partial_closing_names_reject_interpolation() -> () {
+    for name in["script", "style"] {
+        for index in 0..name.byte_len() + 1 {
+            let source = "<" + name + ">BODY</" + name.byte_slice(0, index) + "{{x}}"
+                + name.byte_slice(index, name.byte_len())
+                + ">AFTER{{x}}</"
+                + name
+                + ">";
+            let error = testing::expect_err(
+                html_engine().render_html_string(source, html_context("MARK")),
+                "dynamic closing tag name",
+            );
+            testing::assert_eq(error.kind, ErrorKind::Type);
+        }
+    }
+}
+
+#[test]
+fn contextual_raw_interpolations_interrupt_literal_tag_and_comment_prefixes() -> () {
+    for name in["script", "style"] {
+        for value in["MARK", ""] {
+            let source = "<" + name + "><{{x}}/" + name + ">{{x}}</" + name + ">";
+            let quoted = "\"" + value + "\"";
+            testing::assert_eq(
+                html_render(source, value),
+                "<" + name + "><" + quoted + "/" + name + ">" + quoted + "</" + name + ">",
+            );
+        }
+    }
+    let context = Value::Object(Vec::from_array([("x", Value::Int(2))]));
+    for operation in["/", "*"] {
+        testing::assert_eq(
+            testing::expect_ok(
+                html_engine().render_html_string(
+                    "<script>let a=8/{{x}}" + operation + "2; let b=1<{{x}};</script>",
+                    context,
+                ),
+                "JavaScript arithmetic around interpolation",
+            ),
+            "<script>let a=8/2" + operation + "2; let b=1<2;</script>",
+        );
+    }
+    let comparison = Value::Object(
+        Vec::from_array([("x", Value::Int(4)), ("y", Value::Text("MARK<&>"))]),
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            html_engine().render_html_string(
+                "<script>let script=2;let result=1<{{x}}/script>0;let text={{y}};</script>",
+                comparison,
+            ),
+            "comparison followed by division remains inside script",
+        ),
+        "<script>let script=2;let result=1<4/script>0;let text=\"MARK\\u003c\\u0026\\u003e\";</script>",
+    );
+}
+
+#[test]
 fn contextual_rejects_unsafe_or_ambiguous_positions() -> () {
     for source in["<a href=\"{{x}}\">x</a>", "<img src=\"{{x}}\">"] {
         for value in["javascript:alert(1)", "data:text/html,boom", " javaScript:alert(1)"] {
