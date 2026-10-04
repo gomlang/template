@@ -17,6 +17,26 @@ struct ExpressionParser {
     cursor: Ref[isize],
 }
 
+const NUMERIC_UNARY_BINDING_POWER: isize = 8;
+
+fn binding_power(token: Token) -> isize {
+    if token.kind == -1 || token.kind == 3 {
+        return 0
+    }
+    match token.text {
+        "if" => 1,
+        "or" => 2,
+        "and" => 3,
+        "==" | "!=" | "<" | ">" | "<=" | ">=" | "in" | "is" | "not" => 4,
+        "~" => 5,
+        "+" | "-" => 6,
+        "*" | "/" | "//" | "%" => 7,
+        "**" => 9,
+        "." | "[" | "(" | "|" => 10,
+        _ => 0,
+    }
+}
+
 fn digit(byte: u8) -> bool {
     byte >= 48 && byte <= 57
 }
@@ -338,7 +358,18 @@ impl ExpressionParser {
         } else if token.text == "not" || token.text == "+" || token.text == "-" {
             if token.text == "-" && self.current().kind == 2
                 && self.current().text == "9223372036854775808" {
+                let operand = self.current();
                 self.cursor.set(self.cursor.get() + 1);
+                if binding_power(self.current()) > NUMERIC_UNARY_BINDING_POWER {
+                    return Result::Err(
+                        problem(
+                            self.compile.source,
+                            operand.offset,
+                            ErrorKind::Syntax,
+                            "integer operand 9223372036854775808 exceeds i64; parenthesize -9223372036854775808 before applying this operator",
+                        ),
+                    )
+                }
                 ExprKind::Literal(Value::Int(-9223372036854775808))
             } else {
                 ExprKind::Unary(
@@ -347,7 +378,7 @@ impl ExpressionParser {
                         if token.text == "not" {
                             4
                         } else {
-                            8
+                            NUMERIC_UNARY_BINDING_POWER
                         },
                         depth + 1,
                     )?,
@@ -411,7 +442,8 @@ impl ExpressionParser {
         let mut chain_started = false;
         loop {
             let token = self.current();
-            if token.kind == -1 || token.kind == 3 {
+            let precedence = binding_power(token);
+            if precedence == 0 || precedence < minimum {
                 break;
             }
             if self.take(".") {
@@ -496,20 +528,6 @@ impl ExpressionParser {
                 };
                 left = self.compile.expr(ExprKind::Filter(left, name, args), token.offset, depth)?;
                 continue;
-            }
-            let precedence = match token.text {
-                "if" => 1,
-                "or" => 2,
-                "and" => 3,
-                "==" | "!=" | "<" | ">" | "<=" | ">=" | "in" | "is" | "not" => 4,
-                "~" => 5,
-                "+" | "-" => 6,
-                "*" | "/" | "//" | "%" => 7,
-                "**" => 9,
-                _ => 0,
-            };
-            if precedence == 0 || precedence < minimum {
-                break;
             }
             self.cursor.set(self.cursor.get() + 1);
             if token.text == "if" {

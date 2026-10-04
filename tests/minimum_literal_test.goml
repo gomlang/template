@@ -1,0 +1,101 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn minimum_integer_magnitude_is_not_a_power_or_postfix_operand() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for suffix in["**0", "**-2", "|float", "|default(0)", "[0]", ".field", "()"] {
+        let error = testing::expect_err(
+            engine.render_string(
+                "行\n{{ -9223372036854775808" + suffix + " }}",
+                Value::Object(Vec::new()),
+            ),
+            "out-of-range positive operand",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Syntax);
+        testing::assert_eq(error.location.offset, "行\n{{ -".byte_len());
+        testing::assert_eq(error.location.line, 2);
+        testing::assert_eq(error.location.column, 5);
+        testing::assert(error.message.contains("parenthesize"));
+    }
+}
+
+#[test]
+fn minimum_integer_literals_keep_parenthesized_and_lower_precedence_operations() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for (source, expected) in[
+        ("{{ -9223372036854775808 }}", "-9223372036854775808"),
+        ("{{ (-9223372036854775808)**0 }}", "1"),
+        ("{{ (-9223372036854775808)**0 is integer }}", "true"),
+        ("{{ -9223372036854775808 + 1 }}", "-9223372036854775807"),
+        ("{{ -9223372036854775808 % -1 }}", "0"),
+        ("{{ -9223372036854775808 is integer }}", "true"),
+        ("{{ -9223372036854775808 == -9223372036854775808 }}", "true"),
+        ("{{ -2**0 }}|{{ (-2)**0 }}", "-1|1"),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string(source, Value::Object(Vec::new())),
+                "literal precedence",
+            ),
+            expected,
+        );
+    }
+    for source in[
+        "{{ 9223372036854775808 }}",
+        "{{ 9223372036854775808**0 }}",
+        "{{ -9223372036854775809 }}",
+    ] {
+        testing::assert_eq(
+            testing::expect_err(
+                engine.render_string(source, Value::Object(Vec::new())),
+                "integer range",
+            ).kind,
+            ErrorKind::Syntax,
+        );
+    }
+}
+
+#[test]
+fn minimum_literal_checks_precede_filter_callbacks() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let observed = Ref::new(0.to_i64());
+    let calls = Ref::new(0);
+    testing::assert_ok(
+        engine.register_filter(
+            "record",
+            |value, _| {
+                calls.set(calls.get() + 1);
+                observed.set(value.as_int().unwrap_or(0));
+                Result::Ok(value)
+            },
+        ),
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string("{{ -2|record }}", Value::Object(Vec::new())),
+            "ordinary unary",
+        ),
+        "-2",
+    );
+    testing::assert_eq(observed.get(), 2.to_i64());
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string("{{ (-9223372036854775808)|record }}", Value::Object(Vec::new())),
+            "parenthesized minimum",
+        ),
+        "-9223372036854775808",
+    );
+    testing::assert_eq(observed.get(), -9223372036854775808);
+    testing::assert_eq(calls.get(), 2);
+    testing::assert_eq(
+        testing::expect_err(
+            engine.render_string("{{ -9223372036854775808|record }}", Value::Object(Vec::new())),
+            "unrepresentable filter operand",
+        ).kind,
+        ErrorKind::Syntax,
+    );
+    testing::assert_eq(calls.get(), 2);
+}

@@ -1,0 +1,26 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn downstream_minimum_integer_literal_requires_explicit_power_grouping() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{{ (-9223372036854775808)**0 }}|{{ -9223372036854775808 is integer }}",
+                Value::Object(Vec::new()),
+            ),
+            "minimum integer",
+        ),
+        "1|true",
+    );
+    let error = testing::expect_err(
+        engine.render_string("{{ -9223372036854775808**0 }}", Value::Object(Vec::new())),
+        "unrepresentable positive operand",
+    );
+    testing::assert_eq(error.kind, ErrorKind::Syntax);
+    testing::assert_eq(error.location.column, 5);
+    testing::assert(error.message.contains("parenthesize"));
+}

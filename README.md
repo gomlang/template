@@ -161,9 +161,12 @@ in one short-circuit chain.
 
 Integer arithmetic checks overflow. Integer floor division/remainder follow the
 divisor's sign. The minimum integer modulo -1 is zero; its floor division by -1
-still rejects the overflowing quotient. Division produces a float; mixed numeric
-arithmetic uses f64 and
-rejects nonfinite results. Float remainder uses Go's `math.Mod` with the sign
+still rejects the overflowing quotient. The signed minimum literal is supported,
+but its positive magnitude `9223372036854775808` is outside i64. Parenthesize the
+minimum before power or postfix operators, for example `(-9223372036854775808)**0`;
+without parentheses their positive operand is rejected as an out-of-range literal.
+Division produces a float; mixed numeric arithmetic uses f64 and rejects nonfinite
+results. Float remainder uses Go's `math.Mod` with the sign
 adjusted to the divisor, including signed zero. It avoids forming the quotient,
 so finite operands can produce a valid remainder even if division would overflow.
 Float floor division derives its quotient after removing the remainder, following
