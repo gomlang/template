@@ -132,6 +132,7 @@ impl Output {
                 ),
             )
         }
+        self.bytes.reserve(value.byte_len());
         for byte in value.to_bytes() {
             self.bytes.push(byte);
         }
