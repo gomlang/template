@@ -38,3 +38,18 @@ fn downstream_sort_by_attribute() -> () {
         "AB",
     );
 }
+
+#[test]
+fn downstream_floating_remainder_handles_large_operands() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{{ 1e308 % 3.0 }}|{{ -1e20 % 3.0 }}|{{ 1e308 % 0.1 == 0.06093288384329992 }}",
+                template::Value::Object(Vec::new()),
+            ),
+            "floating remainder",
+        ),
+        "2|2|true",
+    );
+}

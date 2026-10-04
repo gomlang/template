@@ -155,7 +155,9 @@ before filtering it: `((xs + ys) * 2)|join(',')`.
 
 Integer arithmetic checks overflow. Integer floor division/remainder follow the
 divisor's sign. Division produces a float; mixed numeric arithmetic uses f64 and
-rejects nonfinite results. Float remainder is defined by `a - floor(a / b) * b`.
+rejects nonfinite results. Float remainder uses Go's `math.Mod` with the sign
+adjusted to the divisor, including signed zero. It avoids forming the quotient,
+so finite operands can produce a valid remainder even if division would overflow.
 Integer/float comparisons inspect the floating representation so large integers
 are not rounded to f64 merely to compare them. String ordering is case-sensitive
 Unicode/UTF-8 lexical order. Structural list/object equality is bounded by the
@@ -280,7 +282,7 @@ From the repository root:
 (cd ../verification && just ecosystem-test template)
 ```
 
-There are 19 external library tests and 6 example tests, also checked independently by `goml verify`.
+External library tests and example tests are also checked independently by `goml verify`.
 They cover grammar, scopes, generic Serde context conversion, captured callbacks,
 inheritance, loaders, cache replacement, safety propagation, malformed inputs,
 numeric boundaries, cycles and limits. The example is built and run separately;

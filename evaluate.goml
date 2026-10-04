@@ -3,6 +3,21 @@ package template;
 use std::num;
 use std::math;
 
+#[go_ffi("math", "Mod")]
+extern fn truncating_remainder(left: f64, right: f64) -> f64;
+
+fn float_modulo(left: f64, right: f64) -> f64 {
+    // Reducing before sign adjustment avoids overflowing or rounding a / b.
+    let remainder = truncating_remainder(left, right);
+    if remainder == 0.0 {
+        float64_from_bits(right.to_bits() & 0x8000000000000000)
+    } else if (remainder < 0.0) != (right < 0.0) {
+        remainder + right
+    } else {
+        remainder
+    }
+}
+
 fn bounded_index(value: i64, length: isize, reverse: bool) -> isize {
     let size = length.to_i64();
     if value < 0 {
@@ -655,7 +670,7 @@ impl Runtime {
             "*" => a * b,
             "/" => a / b,
             "//" => math::floor(a / b),
-            "%" => a - math::floor(a / b) * b,
+            "%" => float_modulo(a, b),
             "**" => math::pow(a, b),
             _ => return Result::Err(problem(source, offset, ErrorKind::Type, "unknown operator")),
         };

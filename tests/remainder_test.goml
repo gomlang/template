@@ -1,0 +1,74 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn floating_remainder_avoids_quotient_overflow_and_cancellation() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for expression in[
+        "1e20 % 3.0 == 1.0",
+        "-1e20 % 3.0 == 2.0",
+        "1e20 % -3.0 == -2.0",
+        "-1e20 % -3.0 == -1.0",
+        "1e308 % 3.0 == 2.0",
+        "1e308 % 0.1 == 0.06093288384329992",
+        "5.5 % 2.0 == 1.5",
+        "-5.5 % 2.0 == 0.5",
+        "5.5 % -2.0 == -0.5",
+        "-5.5 % -2.0 == -1.5",
+        "5.0 % 3 == 2.0",
+        "5 % 3.0 == 2.0",
+        "5e-324 % 1e-323 == 5e-324",
+        "-5e-324 % 1e-323 == 5e-324",
+        "5e-324 % -1e-323 == -5e-324",
+        "-1e-100 % 1e100 == 1e100",
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+                expression,
+            ),
+            "true",
+        );
+    }
+}
+
+#[test]
+fn floating_remainder_zero_has_the_divisors_sign_and_zero_divisors_fail() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_ok(
+        engine.register_filter(
+            "bits",
+            |value, _| match value {
+                Value::Float(number) => Result::Ok(Value::Text(number.to_bits().to_string())),
+                _ => Result::Err("expected float"),
+            },
+        ),
+    );
+    for left in[6.0, -6.0, 0.0, float64_from_bits(0x8000000000000000)] {
+        for right in[3.0, -3.0] {
+            let context = Value::Object(
+                Vec::from_array([("left", Value::Float(left)), ("right", Value::Float(right))]),
+            );
+            testing::assert_eq(
+                testing::expect_ok(
+                    engine.render_string("{{ (left % right)|bits }}", context),
+                    "zero",
+                ),
+                if right < 0.0 {
+                    "9223372036854775808"
+                } else {
+                    "0"
+                },
+            );
+        }
+    }
+    for expression in["1.0 % 0.0", "1.0 % -0.0", "0.0 % 0.0", "1 % 0.0", "1.0 % 0"] {
+        let error = testing::expect_err(
+            engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+            "zero divisor",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Arithmetic);
+    }
+}
