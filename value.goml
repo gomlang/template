@@ -477,10 +477,16 @@ impl Runtime {
                     return Result::Ok(false)
                 }
                 for (key, value) in a {
-                    let other = Value::Object(b).get(key);
-                    if is_missing(other) {
-                        return Result::Ok(false)
+                    let mut other = Option::None;
+                    for (other_key, other_value) in b {
+                        if other_key == key {
+                            other = Option::Some(other_value);
+                            break;
+                        }
                     }
+                    let Some(other) = other else {
+                        return Result::Ok(false)
+                    };
                     if !self.equal(value, other, source, offset, depth + 1)? {
                         return Result::Ok(false)
                     }

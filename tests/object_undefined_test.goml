@@ -1,0 +1,57 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn object_equality_distinguishes_undefined_values_from_absent_keys() -> () {
+    let relaxed = testing::expect_ok(
+        Engine::new(Options { strict_undefined: false, ..Options::standard() }),
+        "engine",
+    );
+    for (source, expected) in[
+        ("{{ {'a': missing} == {'a': other} }}", "true"),
+        ("{{ {'a': missing} != {'a': other} }}", "false"),
+        ("{{ {'a': missing} in [{'a': other}] }}", "true"),
+        ("{{ [{'a': missing}, {'a': other}]|unique|length }}", "1"),
+        ("{{ {'a': missing} == {'b': other} }}", "false"),
+        ("{{ {'a': missing} == {'a': null} }}", "false"),
+        ("{{ {'outer': [{'a': missing}]} == {'outer': [{'a': other}]} }}", "true"),
+        ("{{ {'a': missing, 'b': 1} == {'b': 1, 'a': other} }}", "true"),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                relaxed.render_string(source, Value::Object(Vec::new())),
+                "comparison",
+            ),
+            expected,
+        );
+    }
+}
+
+#[test]
+fn strict_object_comparisons_report_undefined_values() -> () {
+    let strict = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for source in[
+        "{{ {'a': missing} == {'a': other} }}",
+        "{{ {'a': missing} != {'a': other} }}",
+        "{{ {'a': missing} in [{'a': other}] }}",
+        "{{ [{'a': missing}, {'a': other}]|unique|length }}",
+        "{{ {'outer': [{'a': missing}]} == {'outer': [{'a': other}]} }}",
+    ] {
+        testing::assert_eq(
+            testing::expect_err(
+                strict.render_string(source, Value::Object(Vec::new())),
+                "undefined comparison",
+            ).kind,
+            ErrorKind::Undefined,
+        );
+    }
+    testing::assert_eq(
+        testing::expect_ok(
+            strict.render_string("{{ {'a': missing} == {'b': other} }}", Value::Object(Vec::new())),
+            "distinct keys",
+        ),
+        "false",
+    );
+}

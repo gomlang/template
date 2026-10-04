@@ -1,0 +1,28 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn downstream_object_comparisons_preserve_undefined_semantics() -> () {
+    let permissive = testing::expect_ok(
+        Engine::new(Options { strict_undefined: false, ..Options::standard() }),
+        "engine",
+    );
+    let source = "{{ {'a': missing} in [{'a': other}] }}|{{ [{'a': missing}, {'a': other}]|unique|length }}";
+    testing::assert_eq(
+        testing::expect_ok(
+            permissive.render_string(source, Value::Object(Vec::new())),
+            "comparison",
+        ),
+        "true|1",
+    );
+    let strict = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_err(
+            strict.render_string(source, Value::Object(Vec::new())),
+            "strict comparison",
+        ).kind,
+        ErrorKind::Undefined,
+    );
+}

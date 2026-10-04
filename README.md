@@ -121,6 +121,9 @@ lookups so `missing.deep|default('fallback')` works. `is defined` and
 `is undefined` inspect this state without raising. With
 `strict_undefined: false`, undefined output is empty, its truth value is false,
 and iteration is empty. Invalid operations on other value types still fail.
+Structural object equality distinguishes absent keys from fields containing an
+undefined value. Present fields use the same strict/permissive comparison rules
+as standalone values, including inside `in` and `unique`.
 
 ## Expressions
 
