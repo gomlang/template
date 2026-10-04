@@ -64,6 +64,46 @@ fn contextual_script_style_and_trust_markers() -> () {
 }
 
 #[test]
+fn contextual_raw_elements_accept_all_html_whitespace_after_the_tag_name() -> () {
+    for separator in["\f", " ", "\t", "\n", "\r"] {
+        let script = "<ScRiPt" + separator + "data-kind='value'>let x=";
+        testing::assert_eq(
+            html_render(script + "{{x}};</ScRiPt>", "alert(1)"),
+            script + "\"alert(1)\";</ScRiPt>",
+        );
+        let style = "<StYlE" + separator + ">.x{content:";
+        testing::assert_eq(
+            html_render(style + "{{x}}}</StYlE>", "red; color: blue"),
+            style + "\"red; color: blue\"}</StYlE>",
+        );
+    }
+    for name in["scripture", "stylesheet", "script\u00a0", "style\u000b"] {
+        let opening = "<" + name + ">";
+        let closing = "</" + name + ">";
+        testing::assert_eq(
+            html_render(opening + "{{x}}" + closing, "a&b"),
+            opening + "a&amp;b" + closing,
+        );
+    }
+}
+
+#[test]
+fn contextual_raw_elements_with_form_feed_keep_string_and_comment_guards() -> () {
+    for source in[
+        "<script\f>let x='{{x}}';</script>",
+        "<script\f>// {{x}}\n</script>",
+        "<style\f>.x{content:'{{x}}'}</style>",
+        "<style\f>/* {{x}} */</style>",
+    ] {
+        let error = testing::expect_err(
+            html_engine().render_html_string(source, html_context("value")),
+            "unsupported raw string or comment context",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Type);
+    }
+}
+
+#[test]
 fn contextual_rejects_unsafe_or_ambiguous_positions() -> () {
     for source in["<a href=\"{{x}}\">x</a>", "<img src=\"{{x}}\">"] {
         for value in["javascript:alert(1)", "data:text/html,boom", " javaScript:alert(1)"] {

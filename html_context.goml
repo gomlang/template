@@ -155,7 +155,7 @@ fn raw_open(tag: string, name: string) -> bool {
         return false
     }
     let next = tag.byte_get(prefix.byte_len());
-    next == b'>' || next == b'/' || next == b' ' || next == b'\t' || next == b'\n' || next == b'\r'
+    next == b'>' || next == b'/' || html_space(next)
 }
 
 struct HtmlSlot {

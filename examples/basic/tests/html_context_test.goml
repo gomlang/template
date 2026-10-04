@@ -23,3 +23,20 @@ fn contextual_html_consumer_url_and_script() -> () {
         "<a href=\"https://example.test/?a=1&amp;b=2\">&lt;/script&gt;&lt;b&gt;</a><script>let x=\"\\u003c\\u002fscript\\u003e\\u003cb\\u003e\";</script>",
     );
 }
+
+#[test]
+fn contextual_html_consumer_form_feed_keeps_raw_element_context() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    testing::expect_ok(engine.add("value", "{{x}}"), "value");
+    testing::expect_ok(
+        engine.add("page", "<script\f>let x={% include 'value' %};</script>"),
+        "page",
+    );
+    let context = template::Value::Object(
+        Vec::from_array([("x", template::Value::Text("alert(1)"))]),
+    );
+    testing::assert_eq(
+        testing::expect_ok(engine.render_html("page", context), "script with form feed"),
+        "<script\f>let x=\"alert(1)\";</script>",
+    );
+}

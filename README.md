@@ -55,6 +55,8 @@ HTML text escaping mechanics are supplied by `ecosystem::html`. The original
 The engine tracks literal template output across branches and includes. It
 escapes dynamic values as HTML text, quoted or unquoted attribute data, URL data,
 JavaScript JSON values in `<script>`, or CSS quoted strings in `<style>`.
+Raw-element tag names recognize all HTML ASCII whitespace separators, including
+form feed.
 
 URL-valued attributes (`href`, `src`, `action`, `formaction`, `poster`, `cite`,
 `background`, `data`, and `xlink:href`) accept relative references and the
