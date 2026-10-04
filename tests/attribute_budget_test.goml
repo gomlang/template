@@ -1,0 +1,37 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, Limits, ErrorKind};
+use std::testing;
+
+#[test]
+fn attribute_filters_charge_each_path_component_to_the_operation_budget() -> () {
+    let options = Options { strict_undefined: false, ..Options::standard() };
+    let limited = testing::expect_ok(
+        Engine::new(Options { limits: Limits { max_steps: 64, ..options.limits }, ..options }),
+        "limited engine",
+    );
+    let sufficient = testing::expect_ok(
+        Engine::new(Options { limits: Limits { max_steps: 2048, ..options.limits }, ..options }),
+        "sufficient engine",
+    );
+    let values = Vec::new();
+    for _ in 0..8 {
+        values.push(Value::Object(Vec::new()));
+    }
+    let data = Value::Object(
+        Vec::from_array(
+            [("items", Value::List(values)), ("path", Value::Text("a.".repeat(127) + "a"))],
+        ),
+    );
+    for (filter, expected) in[("map", "8"), ("selectattr", "0"), ("rejectattr", "8")] {
+        let source = "{{ items|" + filter + "(path)|length }}";
+        testing::assert_eq(
+            testing::expect_err(limited.render_string(source, data), "path budget").kind,
+            ErrorKind::Limit,
+        );
+        testing::assert_eq(
+            testing::expect_ok(sufficient.render_string(source, data), "sufficient path budget"),
+            expected,
+        );
+    }
+}

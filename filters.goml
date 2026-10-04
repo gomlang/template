@@ -409,6 +409,7 @@ impl Runtime {
                 self.tick(source, offset, 0)?;
                 let mut field = item;
                 for part in path {
+                    self.tick(source, offset, 0)?;
                     field = field.get(part);
                 }
                 if name == "map" {

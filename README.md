@@ -242,8 +242,10 @@ input collection unchanged. Key traversal and comparisons use the operation
 budget; the stable merge sort takes O(n log n) comparisons and O(n) extra storage.
 Its positional signature follows this dialect rather than Jinja's keyword-based
 sort signature. `unique` retains the first structurally equal value. Attribute
-filters use positional path strings. Casing follows `std::unicode`, including
-its Unicode version and simple-case behavior.
+filters use positional path strings. `map`, `selectattr` and `rejectattr` charge
+every attribute-path component for every item to the rendering operation budget,
+including components traversed after a missing value. Casing follows `std::unicode`,
+including its Unicode version and simple-case behavior.
 
 Autoescaping is enabled by default. Escaping covers `&`, `<`, `>`, `"` and `'`.
 `Safe` values and the `safe` filter are explicit trust decisions. Escape avoids

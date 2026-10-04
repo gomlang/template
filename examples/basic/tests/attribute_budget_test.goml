@@ -1,0 +1,33 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, Limits, ErrorKind};
+use std::testing;
+
+#[test]
+fn downstream_attribute_path_iterations_obey_the_render_budget() -> () {
+    let options = Options { strict_undefined: false, ..Options::standard() };
+    let engine = testing::expect_ok(
+        Engine::new(Options { limits: Limits { max_steps: 20, ..options.limits }, ..options }),
+        "engine",
+    );
+    let data = Value::Object(
+        Vec::from_array(
+            [
+                (
+                    "items",
+                    Value::List(
+                        Vec::from_array([Value::Object(Vec::new()), Value::Object(Vec::new())]),
+                    ),
+                ),
+                ("path", Value::Text("a.".repeat(31) + "a")),
+            ],
+        ),
+    );
+    let error = testing::expect_err(
+        engine.render_string("{{ items|map(path)|length }}", data),
+        "attribute budget",
+    );
+    testing::assert_eq(error.kind, ErrorKind::Limit);
+    testing::assert_eq(error.location.template, "<string>");
+    testing::assert_eq(error.location.line, 1);
+}
