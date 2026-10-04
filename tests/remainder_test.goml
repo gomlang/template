@@ -4,6 +4,34 @@ use ecosystem::template::{Engine, Options, Value, ErrorKind};
 use std::testing;
 
 #[test]
+fn minimum_integer_remainder_does_not_require_a_representable_quotient() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for expression in[
+        "-9223372036854775808 % -1 == 0",
+        "-9223372036854775808 % 1 == 0",
+        "-9223372036854775808 % 3 == 1",
+        "-9223372036854775808 % -3 == -2",
+        "1 % -9223372036854775808 == -9223372036854775807",
+        "9223372036854775807 % -9223372036854775808 == -1",
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+                expression,
+            ),
+            "true",
+        );
+    }
+    for expression in["-9223372036854775808 // -1", "-9223372036854775808 % 0"] {
+        let error = testing::expect_err(
+            engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+            "invalid arithmetic",
+        );
+        testing::assert_eq(error.kind, ErrorKind::Arithmetic);
+    }
+}
+
+#[test]
 fn floating_remainder_avoids_quotient_overflow_and_cancellation() -> () {
     let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
     for expression in[

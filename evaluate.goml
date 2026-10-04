@@ -608,8 +608,15 @@ impl Runtime {
                         "-" => num::checked_subtract_int64(a, b).or_error(overflow)?,
                         "*" => num::checked_multiply_int64(a, b).or_error(overflow)?,
                         "//" | "%" => {
-                            if b == 0 || (a == -9223372036854775808 && b == -1) {
+                            if b == 0 {
                                 return Result::Err(overflow())
+                            }
+                            if a == -9223372036854775808 && b == -1 {
+                                return if operator == "%" {
+                                    Result::Ok(Value::Int(0))
+                                } else {
+                                    Result::Err(overflow())
+                                }
                             }
                             let remainder = a % b;
                             if operator == "%" {

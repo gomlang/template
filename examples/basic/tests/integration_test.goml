@@ -53,3 +53,18 @@ fn downstream_floating_remainder_handles_large_operands() -> () {
         "2|2|true",
     );
 }
+
+#[test]
+fn downstream_minimum_integer_modulo_negative_one_is_integer_zero() -> () {
+    let engine = testing::expect_ok(template::Engine::new(template::Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{{ -9223372036854775808 % -1 }}|{{ (-9223372036854775808 % -1) is integer }}",
+                template::Value::Object(Vec::new()),
+            ),
+            "integer remainder",
+        ),
+        "0|true",
+    );
+}

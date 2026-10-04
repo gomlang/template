@@ -154,7 +154,9 @@ Power associates to the right. Parenthesize a whole arithmetic expression
 before filtering it: `((xs + ys) * 2)|join(',')`.
 
 Integer arithmetic checks overflow. Integer floor division/remainder follow the
-divisor's sign. Division produces a float; mixed numeric arithmetic uses f64 and
+divisor's sign. The minimum integer modulo -1 is zero; its floor division by -1
+still rejects the overflowing quotient. Division produces a float; mixed numeric
+arithmetic uses f64 and
 rejects nonfinite results. Float remainder uses Go's `math.Mod` with the sign
 adjusted to the divisor, including signed zero. It avoids forming the quotient,
 so finite operands can produce a valid remainder even if division would overflow.
