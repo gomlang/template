@@ -1,0 +1,54 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn repeated_comment_trims_do_not_rescan_the_literal_prefix() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let prefix = "x".repeat(200000) + "中😀";
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(prefix + "{#- x #}".repeat(2000), Value::Object(Vec::new())),
+            "repeated trim comments",
+        ),
+        prefix,
+    );
+}
+
+#[test]
+fn trim_scans_preserve_unicode_boundaries_and_nonspace_scalars() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for (value, left, right, both) in[
+        ("", "", "", ""),
+        (" \t\r\n", "", "", ""),
+        ("\u0085\u00a0中😀\u2003\u3000", "中😀\u2003\u3000", "\u0085\u00a0中😀", "中😀"),
+        (" \u200b ", "\u200b ", " \u200b", "\u200b"),
+        ("\ufeffx\u2028", "\ufeffx\u2028", "\ufeffx", "\ufeffx"),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{# x -#}" + value, Value::Object(Vec::new())),
+                "left trim",
+            ),
+            left,
+        );
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string(value + "{#- x #}", Value::Object(Vec::new())),
+                "right trim",
+            ),
+            right,
+        );
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string(
+                    "{{ value|trim }}",
+                    Value::Object(Vec::from_array([("value", Value::Text(value))])),
+                ),
+                "trim filter",
+            ),
+            both,
+        );
+    }
+}

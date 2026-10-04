@@ -1,0 +1,20 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn downstream_repeated_trims_preserve_a_unicode_literal_prefix() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let prefix = "中😀".repeat(10000);
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                prefix + "\u2003{#- ignored #}".repeat(1000),
+                Value::Object(Vec::new()),
+            ),
+            "repeated Unicode trimming",
+        ),
+        prefix,
+    );
+}

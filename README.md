@@ -214,6 +214,8 @@ markers at their own boundaries. Delimiters inside quoted expressions and object
 literals are recognized without prematurely closing the tag.
 Raw blocks scan only for their exact `endraw` terminator; repeated unmatched
 tag openings in literal text do not rescan the remaining source.
+Whitespace trimming examines only the requested edges, so repeated left-trim
+comments do not rescan an unchanged literal prefix.
 
 ## Builtin functions and filters
 

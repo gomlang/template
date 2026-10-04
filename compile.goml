@@ -2,6 +2,7 @@ package template;
 
 use std::utf8;
 use std::unicode;
+use std::text;
 
 struct Chunk {
     kind: isize,
@@ -583,23 +584,14 @@ pub fn compile(name: string, text: string) -> Result[Template, Error] {
 }
 
 fn trim_space(value: string, left: bool, right: bool) -> string {
-    let mut start = 0;
-    let mut end = value.byte_len();
-    let mut seen = false;
-    for (index, scalar) in value.char_indices() {
-        if !unicode::is_whitespace(scalar) {
-            if !seen && left {
-                start = index;
-            }
-            seen = true;
-            if right {
-                end = index + scalar.to_string().byte_len();
-            }
-        }
-    }
-    if !seen {
-        ""
+    let value = if left {
+        text::trim_start_by(value, |scalar| unicode::is_whitespace(scalar))
     } else {
-        value.byte_slice(start, end)
+        value
+    };
+    if right {
+        text::trim_end_by(value, |scalar| unicode::is_whitespace(scalar))
+    } else {
+        value
     }
 }
