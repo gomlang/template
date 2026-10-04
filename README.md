@@ -160,6 +160,10 @@ arithmetic uses f64 and
 rejects nonfinite results. Float remainder uses Go's `math.Mod` with the sign
 adjusted to the divisor, including signed zero. It avoids forming the quotient,
 so finite operands can produce a valid remainder even if division would overflow.
+Float floor division derives its quotient after removing the remainder, following
+Python/Jinja's boundary behavior: `1.0 // 0.1` is `9.0`, and a tiny negative
+value divided by a large positive value floors to `-1.0` even if ordinary division
+underflows to negative zero. A zero quotient retains the division's sign.
 Integer/float comparisons inspect the floating representation so large integers
 are not rounded to f64 merely to compare them. String ordering is case-sensitive
 Unicode/UTF-8 lexical order. Structural list/object equality is bounded by the

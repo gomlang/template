@@ -1,0 +1,19 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn downstream_float_floor_division_handles_rounding_and_underflow() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{{ 1.0 // 0.1 }}|{{ -5e-324 // 1e308 }}|{{ 74.59 // 12.23 }}",
+                Value::Object(Vec::new()),
+            ),
+            "quotients",
+        ),
+        "9|-1|6",
+    );
+}

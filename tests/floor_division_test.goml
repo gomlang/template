@@ -1,0 +1,72 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn floating_floor_division_avoids_rounded_integer_and_underflow_boundaries() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for expression in[
+        "1.0 // 0.1 == 9.0",
+        "-1.0 // -0.1 == 9.0",
+        "-1.0 // 0.1 == -10.0",
+        "1.0 // -0.1 == -10.0",
+        "0.9 // 0.1 == 8.0",
+        "1 // 0.2 == 4.0",
+        "74.59 // 12.23 == 6.0",
+        "-5e-324 // 1e308 == -1.0",
+        "5e-324 // -1e308 == -1.0",
+        "5e-324 // 1e308 == 0.0",
+        "-5e-324 // -1e308 == 0.0",
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+                expression,
+            ),
+            "true",
+        );
+    }
+    for expression in["1.0 // 0.0", "1.0 // -0.0", "1e308 // 5e-324"] {
+        testing::assert_eq(
+            testing::expect_err(
+                engine.render_string("{{ " + expression + " }}", Value::Object(Vec::new())),
+                "invalid quotient",
+            ).kind,
+            ErrorKind::Arithmetic,
+        );
+    }
+}
+
+#[test]
+fn floating_floor_division_preserves_the_quotients_zero_sign() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_ok(
+        engine.register_filter(
+            "bits",
+            |value, _| match value {
+                Value::Float(number) => Result::Ok(Value::Text(number.to_bits().to_string())),
+                _ => Result::Err("expected float"),
+            },
+        ),
+    );
+    for (left, right, expected) in[
+        (0.0, 3.0, "0"),
+        (0.0, -3.0, "9223372036854775808"),
+        (float64_from_bits(0x8000000000000000), 3.0, "9223372036854775808"),
+        (float64_from_bits(0x8000000000000000), -3.0, "0"),
+        (5e-324, 1e308, "0"),
+        (-5e-324, -1e308, "0"),
+    ] {
+        let context = Value::Object(
+            Vec::from_array([("left", Value::Float(left)), ("right", Value::Float(right))]),
+        );
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{{ (left // right)|bits }}", context),
+                "zero quotient",
+            ),
+            expected,
+        );
+    }
+}
