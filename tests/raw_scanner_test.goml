@@ -1,0 +1,45 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn raw_delimiters_do_not_rescan_the_remaining_body() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let body = "{% x ".repeat(20000) + "{{ invalid + }}";
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string("{% raw %}" + body + "{% endraw %}", Value::Object(Vec::new())),
+            "large raw block",
+        ),
+        body,
+    );
+    testing::assert_eq(
+        testing::expect_err(
+            engine.render_string("{% raw %}" + body, Value::Object(Vec::new())),
+            "missing raw terminator",
+        ).kind,
+        ErrorKind::Syntax,
+    );
+}
+
+#[test]
+fn raw_terminators_preserve_exact_names_unicode_space_and_trim_markers() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for (source, expected) in[
+        ("{% raw %}{% endrawish %}{% endraw x %}{% endraw %}", "{% endrawish %}{% endraw x %}"),
+        ("{% raw %}{% {% endraw %}", "{% "),
+        ("{% raw %}{% -endraw %}{% endraw- %}{%endraw%}", "{% -endraw %}{% endraw- %}"),
+        ("{% raw %} 中 \n{%\u2003endraw\u2003%} 后", " 中 \n 后"),
+        ("{% raw %} 中 \n{%-\u2003endraw\u2003-%} 后", " 中后"),
+        ("{% raw %}x{%endraw-%}  y", "xy"),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string(source, Value::Object(Vec::new())),
+                "raw terminator",
+            ),
+            expected,
+        );
+    }
+}

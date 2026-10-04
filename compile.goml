@@ -23,6 +23,39 @@ fn trim_previous(chunks: Vec[Chunk]) -> () {
     }
 }
 
+fn raw_terminator(input: string, start: isize) -> Option[(isize, bool, bool)] {
+    let mut index = start;
+    let left_trim = input.starts_with_at(index, "-");
+    if left_trim {
+        index += 1;
+    }
+    while let Some((scalar, width)) = input.decode_at(index) {
+        if !unicode::is_whitespace(scalar) {
+            break;
+        }
+        index += width;
+    }
+    if !input.starts_with_at(index, "endraw") {
+        return Option::None
+    }
+    index += 6;
+    while let Some((scalar, width)) = input.decode_at(index) {
+        if !unicode::is_whitespace(scalar) {
+            break;
+        }
+        index += width;
+    }
+    let right_trim = input.starts_with_at(index, "-");
+    if right_trim {
+        index += 1;
+    }
+    if input.starts_with_at(index, "%}") {
+        Option::Some((index + 2, left_trim, right_trim))
+    } else {
+        Option::None
+    }
+}
+
 fn scan_chunks(compile: Compile) -> Result[Vec[Chunk], Error] {
     let input = compile.source.text;
     let chunks = Vec::new();
@@ -46,29 +79,10 @@ fn scan_chunks(compile: Compile) -> Result[Vec[Chunk], Error] {
                 index += 1;
                 continue;
             }
-            let mut end = index + 2;
-            while end + 1 < input.byte_len()
-                && !(input.byte_get(end) == 37 && input.byte_get(end + 1) == 125) {
-                end += 1;
-            }
-            if end + 1 >= input.byte_len() {
+            let Some((end, left_trim, right_trim)) = raw_terminator(input, index + 2) else {
                 index += 1;
                 continue;
-            }
-            let mut body_start = index + 2;
-            let mut body_end = end;
-            let left_trim = body_start < body_end && input.byte_get(body_start) == 45;
-            if left_trim {
-                body_start += 1;
-            }
-            let right_trim = body_start < body_end && input.byte_get(body_end - 1) == 45;
-            if right_trim {
-                body_end -= 1;
-            }
-            if trim_space(input.byte_slice(body_start, body_end), true, true) != "endraw" {
-                index += 1;
-                continue;
-            }
+            };
             let mut text = input.byte_slice(start, index);
             if trim_next {
                 text = trim_space(text, true, false);
@@ -79,7 +93,7 @@ fn scan_chunks(compile: Compile) -> Result[Vec[Chunk], Error] {
             chunks.push(Chunk { kind: 0, text, offset: start });
             trim_next = right_trim;
             raw = false;
-            index = end + 2;
+            index = end;
             start = index;
             continue;
         }

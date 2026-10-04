@@ -212,6 +212,8 @@ inside an opening or closing delimiter trims adjacent Unicode whitespace:
 `{{- value -}}`, `{%- if ready -%}` and `{#- comment -#}`. Raw blocks honor trim
 markers at their own boundaries. Delimiters inside quoted expressions and object
 literals are recognized without prematurely closing the tag.
+Raw blocks scan only for their exact `endraw` terminator; repeated unmatched
+tag openings in literal text do not rescan the remaining source.
 
 ## Builtin functions and filters
 

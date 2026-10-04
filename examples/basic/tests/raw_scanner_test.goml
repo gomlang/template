@@ -1,0 +1,15 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn downstream_raw_blocks_keep_unmatched_tag_openings_literal() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let body = "{% ".repeat(10000) + "中";
+    let source = "{% raw %}" + body + " \n{%- endraw -%} tail";
+    testing::assert_eq(
+        testing::expect_ok(engine.render_string(source, Value::Object(Vec::new())), "raw block"),
+        body + "tail",
+    );
+}
