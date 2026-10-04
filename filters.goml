@@ -487,10 +487,8 @@ impl Runtime {
                 Value::Float(
                     if name == "round" {
                         math::round(number)
-                    } else if number < 0.0 {
-                        -number
                     } else {
-                        number
+                        float64_from_bits(number.to_bits() & 0x7fffffffffffffff)
                     },
                 ),
             )

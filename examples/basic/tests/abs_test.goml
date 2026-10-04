@@ -1,0 +1,16 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn absolute_negative_zero_serializes_without_a_negative_sign() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let context = Value::Object(
+        Vec::from_array([("value", Value::Float(float64_from_bits(0x8000000000000000)))]),
+    );
+    testing::assert_eq(
+        testing::expect_ok(engine.render_string("{{ value|abs|tojson }}", context), "absolute zero"),
+        "0",
+    );
+}

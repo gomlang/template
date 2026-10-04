@@ -224,7 +224,8 @@ Functions are `range(stop)`, `range(start, stop[, step])`, `len`, `str`, `bool`,
 
 Filters check arity and argument types. `default` substitutes only undefined
 values unless its second argument is true. Numeric conversions are strict;
-invalid text fails instead of silently becoming zero. `round` uses the standard
+invalid text fails instead of silently becoming zero. `abs` clears the sign of
+floating values, including negative zero. `round` uses the standard
 library's rounding to nearest, with halves away from zero. `sort` is stable and
 case-sensitive. `sort(false, 'profile.rank')` sorts objects by a dot-separated
 attribute path, evaluating each key once and preserving the input order of equal
