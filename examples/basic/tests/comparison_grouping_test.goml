@@ -1,0 +1,19 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn downstream_parenthesized_comparisons_produce_boolean_operands() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{{ (1 < 2) == true }}|{{ (false == true) == false }}|{{ false == true == false }}",
+                Value::Object(Vec::new()),
+            ),
+            "comparison grouping",
+        ),
+        "true|true|false",
+    );
+}

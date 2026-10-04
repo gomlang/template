@@ -408,6 +408,7 @@ impl ExpressionParser {
 
     fn parse(self: ExpressionParser, minimum: isize, depth: isize) -> Result[Expr, Error] {
         let mut left = self.atom(depth)?;
+        let mut chain_started = false;
         loop {
             let token = self.current();
             if token.kind == -1 || token.kind == 3 {
@@ -540,13 +541,15 @@ impl ExpressionParser {
                     depth + 1,
                 )?;
                 let kind = if precedence == 4 {
-                    match left.kind {
-                        ExprKind::Compare(first, comparisons) => {
+                    let comparison = match left.kind {
+                        ExprKind::Compare(first, comparisons) if chain_started => {
                             comparisons.push((operator, right));
                             ExprKind::Compare(first, comparisons)
                         },
                         _ => ExprKind::Compare(left, Vec::from_array([(operator, right)])),
-                    }
+                    };
+                    chain_started = true;
+                    comparison
                 } else {
                     ExprKind::Binary(operator, left, right)
                 };

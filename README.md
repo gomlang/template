@@ -155,6 +155,9 @@ addition/subtraction, multiplication/division/remainder, unary numeric operators
 power, then access/calls/filters. `not` includes comparisons in its operand.
 Power associates to the right. Parenthesize a whole arithmetic expression
 before filtering it: `((xs + ys) * 2)|join(',')`.
+Parentheses end a comparison chain: `(1 < 2) == true` compares the first
+comparison's boolean result, while `1 < 2 == true` compares adjacent operands
+in one short-circuit chain.
 
 Integer arithmetic checks overflow. Integer floor division/remainder follow the
 divisor's sign. The minimum integer modulo -1 is zero; its floor division by -1

@@ -1,0 +1,69 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, ErrorKind};
+use std::testing;
+
+#[test]
+fn parentheses_keep_comparison_results_separate_from_outer_chains() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    for (source, expected) in[
+        ("{{ (1 < 2) == true }}", "true"),
+        ("{{ (false == true) == false }}", "true"),
+        ("{{ (false == true) != true }}", "true"),
+        ("{{ ((false == true)) == false }}", "true"),
+        ("{{ (1 < 2) == (3 < 4) }}", "true"),
+        ("{{ (1 < 2) == (3 < 4) == true }}", "true"),
+        ("{{ (1 < 2) in [true] }}", "true"),
+        ("{{ (1 < 2) not in [false] }}", "true"),
+        ("{{ 1 < 2 < 3 }}", "true"),
+        ("{{ 1 < 2 == true }}", "false"),
+        ("{{ false == true == false }}", "false"),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string(source, Value::Object(Vec::new())),
+                "comparison",
+            ),
+            expected,
+        );
+    }
+    testing::assert_eq(
+        testing::expect_err(
+            engine.render_string("{{ (1 < 2) < 3 }}", Value::Object(Vec::new())),
+            "boolean ordering",
+        ).kind,
+        ErrorKind::Type,
+    );
+}
+
+#[test]
+fn grouped_comparisons_do_not_short_circuit_the_outer_comparison() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let calls = Ref::new(0);
+    testing::assert_ok(
+        engine.register_function(
+            "probe",
+            |_| {
+                calls.set(calls.get() + 1);
+                Result::Ok(Value::Bool(false))
+            },
+        ),
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string("{{ (false == true) == probe() }}", Value::Object(Vec::new())),
+            "grouped comparison",
+        ),
+        "true",
+    );
+    testing::assert_eq(calls.get(), 1);
+    calls.set(0);
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string("{{ false == true == probe() }}", Value::Object(Vec::new())),
+            "comparison chain",
+        ),
+        "false",
+    );
+    testing::assert_eq(calls.get(), 0);
+}
