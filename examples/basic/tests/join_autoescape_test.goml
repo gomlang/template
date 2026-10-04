@@ -1,0 +1,21 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn downstream_join_obeys_disabled_autoescape_and_contextual_html() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let source = "{% autoescape false %}<p>{{ ['<x>', '<b>'|safe]|join('&'|safe) }}</p>{% endautoescape %}";
+    testing::assert_eq(
+        testing::expect_ok(engine.render_string(source, Value::Object(Vec::new())), "text render"),
+        "<p><x>&<b></p>",
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_html_string(source, Value::Object(Vec::new())),
+            "HTML render",
+        ),
+        "<p>&lt;x&gt;&amp;&lt;b&gt;</p>",
+    );
+}

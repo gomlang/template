@@ -1,0 +1,72 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn join_uses_the_active_autoescape_scope() -> () {
+    for autoescape in[false, true] {
+        let engine = testing::expect_ok(
+            Engine::new(Options { autoescape, ..Options::standard() }),
+            "engine",
+        );
+        for (expression, escaped, raw) in[
+            ("['<x>', '<b>'|safe]|join('&'|safe)", "&lt;x&gt;&<b>", "<x>&<b>"),
+            ("['<x>', '<b>'|safe]|join('&')", "&lt;x&gt;&amp;<b>", "<x>&<b>"),
+            ("['<x>', '<b>']|join('&'|safe)", "&lt;x&gt;&&lt;b&gt;", "<x>&<b>"),
+            ("['<x>'|safe, '<b>'|safe]|join('&'|safe)", "<x>&<b>", "<x>&<b>"),
+            ("['<x>', '<b>'|safe]|join", "&lt;x&gt;<b>", "<x><b>"),
+            ("[]|join('&'|safe)", "", ""),
+        ] {
+            let source = "{{ " + expression + " }}";
+            testing::assert_eq(
+                testing::expect_ok(engine.render_string(source, Value::Object(Vec::new())), "join"),
+                if autoescape {
+                    escaped
+                } else {
+                    raw
+                },
+            );
+            testing::assert_eq(
+                testing::expect_ok(
+                    engine.render_string(
+                        "{% autoescape false %}" + source + "{% endautoescape %}",
+                        Value::Object(Vec::new()),
+                    ),
+                    "disabled join",
+                ),
+                raw,
+            );
+            testing::assert_eq(
+                testing::expect_ok(
+                    engine.render_string(
+                        "{% autoescape true %}" + source + "{% endautoescape %}",
+                        Value::Object(Vec::new()),
+                    ),
+                    "enabled join",
+                ),
+                escaped,
+            );
+        }
+    }
+}
+
+#[test]
+fn disabled_join_returns_plain_text_for_later_escaping() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let source = "{% autoescape false %}{% set joined = ['<x>', '<b>'|safe]|join('&'|safe) %}{% autoescape true %}{{ joined }}{% endautoescape %}{% endautoescape %}";
+    testing::assert_eq(
+        testing::expect_ok(engine.render_string(source, Value::Object(Vec::new())), "later escape"),
+        "&lt;x&gt;&amp;&lt;b&gt;",
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_html_string(
+                "{% autoescape false %}<p>{{ ['<x>', '<b>'|safe]|join('&'|safe) }}</p>{% endautoescape %}",
+                Value::Object(Vec::new()),
+            ),
+            "contextual escape",
+        ),
+        "<p>&lt;x&gt;&amp;&lt;b&gt;</p>",
+    );
+}

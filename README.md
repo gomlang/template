@@ -251,10 +251,11 @@ Autoescaping is enabled by default. Escaping covers `&`, `<`, `>`, `"` and `'`.
 `Safe` values and the `safe` filter are explicit trust decisions. Escape avoids
 re-escaping safe values; `forceescape` always escapes. Concatenation and joins
 preserve safe fragments while escaping ordinary fragments when appropriate.
-The `~` operator respects a disabled autoescape scope; safe-string `+` retains
-safe-string composition rules. Case/trim filters preserve safe status; `replace`
-returns ordinary text. `tojson` is useful for JSON text inside script content;
-normal quoted HTML attributes still require the corresponding HTML escaping.
+The `~` operator and `join` respect a disabled autoescape scope: `join` produces
+ordinary unescaped text even when its separator or items are safe. Safe-string
+`+` retains safe-string composition rules. Case/trim filters preserve safe status;
+`replace` returns ordinary text. `tojson` is useful for JSON text inside script
+content; normal quoted HTML attributes still require the corresponding HTML escaping.
 
 The dialect does not include macros/imports, arbitrary object method calls,
 keyword-argument calls, recursive-loop syntax, loop-control extensions, custom

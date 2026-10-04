@@ -305,7 +305,7 @@ impl Runtime {
             };
             let separator_text = text_argument(separator, source, offset)?;
             let items = self.sequence(value, source, offset)?;
-            let mut safe = is_safe(separator);
+            let mut safe = autoescape && is_safe(separator);
             if autoescape {
                 for item in items {
                     safe = safe || is_safe(item);
