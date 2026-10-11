@@ -1,15 +1,17 @@
 package tests;
 
-use ecosystem::verification::reference;
+use ecosystem::testkit::reference;
 use std::json;
+use std::fs;
+use std::env;
 use std::testing;
 
 #[test]
 fn pinned_jinja_markupsafe_reference() -> () {
-    let fixture = reference::load();
+    let fixture = reference::load(fixture_path("tests/data/reference.json"));
     let actual = reference::array(
         testing::expect_ok(
-            reference::run_json("template", reference::field(fixture, "input")),
+            reference::run_json(example_binary(), reference::field(fixture, "input")),
             "reference protocol",
         ),
     );
@@ -24,5 +26,25 @@ fn pinned_jinja_markupsafe_reference() -> () {
                 "Jinja case " + index.to_string(),
             ),
         }
+    }
+}
+
+fn fixture_path(path: string) -> string {
+    if fs::is_dir("examples/basic") {
+        "examples/basic/" + path
+    } else {
+        path
+    }
+}
+
+fn example_binary() -> string {
+    if let Ok(binary) = env::var_structured("GOML_VERIFY_BINARY") {
+        return binary
+    }
+    let example = "_artifact/bin/examples/basic/basic";
+    if fs::is_file(example) {
+        example
+    } else {
+        "_artifact/bin/template"
     }
 }

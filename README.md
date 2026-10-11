@@ -308,7 +308,7 @@ registered application code.
 From the repository root:
 
 ```sh
-(cd ../verification && just ecosystem-test template)
+(cd ../workflows && just ecosystem-test template)
 ```
 
 External library tests and example tests are also checked independently by the ecosystem verifier.
@@ -325,16 +325,16 @@ Unicode slice cases, generated arithmetic, exact mixed-number comparisons,
 escaping/captures, filtered loops, includes and multilevel inheritance. [Fixture provenance](examples/basic/tests/data/README.md) records the exact
 reference distributions, digests, seed, and origin. Running the tests requires
 GoML, with no Python interpreter or reference packages. Logs are retained under
-`../verification/_artifact/verification/template`.
+`../workflows/_artifact/verification/template`.
 
 ## Development and examples
 
-Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/workflows/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-(cd ../verification && just ecosystem-test template)
+(cd ../workflows && just ecosystem-test template)
 ```
 
 `goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
@@ -349,5 +349,5 @@ repository includes that manifest. CI prepares the declared native Go dependenci
 Before local verification, fetch them from this repository root:
 
 ```sh
-python3 ../verification/ci/ecosystem.py native --libraries .. --module template
+python3 ../workflows/ci/ecosystem.py native --libraries .. --module template
 ```
