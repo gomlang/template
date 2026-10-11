@@ -311,7 +311,7 @@ From the repository root:
 (cd ../verification && just ecosystem-test template)
 ```
 
-External library tests and example tests are also checked independently by `goml verify`.
+External library tests and example tests are also checked independently by the ecosystem verifier.
 They cover grammar, scopes, generic Serde context conversion, captured callbacks,
 inheritance, loaders, cache replacement, safety propagation, malformed inputs,
 numeric boundaries, cycles and limits. The example is built and run separately;
@@ -329,15 +329,15 @@ GoML, with no Python interpreter or reference packages. Logs are retained under
 
 ## Development and examples
 
-Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-goml verify --timeout 300s
+(cd ../verification && just ecosystem-test template)
 ```
 
-`goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test template)` also retains the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
 
 ## Native dependency setup
 
@@ -345,6 +345,9 @@ The HTML dependency includes a managed Go adapter for document parsing and
 sanitization. Projects using this module need a module-root `go.mod`, even when
 they use only the existing text APIs. A minimal Go module with `go 1.26.0` is
 sufficient; GoML generates the adapter requirements and replacements. This
-repository includes that manifest. Fetch the declared native Go dependencies
-before building with readonly module resolution; ecosystem verification and CI
-do this automatically.
+repository includes that manifest. CI prepares the declared native Go dependencies.
+Before local verification, fetch them from this repository root:
+
+```sh
+python3 ../verification/ci/ecosystem.py native --libraries .. --module template
+```
