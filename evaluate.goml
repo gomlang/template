@@ -3,8 +3,67 @@ package template;
 use std::num;
 use std::math;
 
-#[go_ffi("math", "Mod")]
-extern fn truncating_remainder(left: f64, right: f64) -> f64;
+fn truncating_remainder(left: f64, right: f64) -> f64 {
+    let sign = left.to_bits() & 0x8000000000000000;
+    let left_bits = left.to_bits() & 0x7fffffffffffffff;
+    let right_bits = right.to_bits() & 0x7fffffffffffffff;
+    if right_bits == 0 || left_bits >= 0x7ff0000000000000 || right_bits > 0x7ff0000000000000 {
+        return float64_from_bits(0x7ff8000000000001)
+    }
+    if left_bits < right_bits {
+        return left
+    }
+    if left_bits == right_bits {
+        return float64_from_bits(sign)
+    }
+    let mut left_exponent = (left_bits >> 52).to_isize();
+    let mut right_exponent = (right_bits >> 52).to_isize();
+    let mut remainder = left_bits & 0x000fffffffffffff;
+    let mut divisor = right_bits & 0x000fffffffffffff;
+    if left_exponent == 0 {
+        left_exponent = 1;
+        while remainder < 0x0010000000000000 {
+            remainder <<= 1;
+            left_exponent -= 1;
+        }
+    } else {
+        remainder |= 0x0010000000000000;
+    }
+    if right_exponent == 0 {
+        right_exponent = 1;
+        while divisor < 0x0010000000000000 {
+            divisor <<= 1;
+            right_exponent -= 1;
+        }
+    } else {
+        divisor |= 0x0010000000000000;
+    }
+    while left_exponent > right_exponent {
+        if remainder >= divisor {
+            remainder -= divisor;
+        }
+        if remainder == 0 {
+            return float64_from_bits(sign)
+        }
+        remainder <<= 1;
+        left_exponent -= 1;
+    }
+    if remainder >= divisor {
+        remainder -= divisor;
+    }
+    if remainder == 0 {
+        return float64_from_bits(sign)
+    }
+    while remainder < 0x0010000000000000 {
+        remainder <<= 1;
+        left_exponent -= 1;
+    }
+    if left_exponent > 0 {
+        float64_from_bits(sign | (left_exponent.to_u64() << 52) | (remainder & 0x000fffffffffffff))
+    } else {
+        float64_from_bits(sign | (remainder >> (1 - left_exponent)))
+    }
+}
 
 fn float_modulo(left: f64, right: f64) -> f64 {
     // Reducing before sign adjustment avoids overflowing or rounding a / b.

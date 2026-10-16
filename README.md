@@ -172,8 +172,8 @@ but its positive magnitude `9223372036854775808` is outside i64. Parenthesize th
 minimum before power or postfix operators, for example `(-9223372036854775808)**0`;
 without parentheses their positive operand is rejected as an out-of-range literal.
 Division produces a float; mixed numeric arithmetic uses f64 and rejects nonfinite
-results. Float remainder uses Go's `math.Mod` with the sign
-adjusted to the divisor, including signed zero. It avoids forming the quotient,
+results. Float remainder reduces binary significands in GoML, then adjusts the sign
+to the divisor, including signed zero. It avoids forming the quotient,
 so finite operands can produce a valid remainder even if division would overflow.
 Float floor division derives its quotient after removing the remainder, following
 Python/Jinja's boundary behavior: `1.0 // 0.1` is `9.0`, and a tiny negative
@@ -339,15 +339,5 @@ goml test
 
 `goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
 
-## Native dependency setup
-
-The HTML dependency includes a managed Go adapter for document parsing and
-sanitization. Projects using this module need a module-root `go.mod`, even when
-they use only the existing text APIs. A minimal Go module with `go 1.26.0` is
-sufficient; GoML generates the adapter requirements and replacements. This
-repository includes that manifest. CI prepares the declared native Go dependencies.
-Before local verification, fetch them from this repository root:
-
-```sh
-python3 ../workflows/ci/ecosystem.py native --libraries .. --module template
-```
+The engine and its HTML dependency are implemented in GoML. Consumers need only
+their `goml.toml`; no native adapter setup or module-root `go.mod` is required.
