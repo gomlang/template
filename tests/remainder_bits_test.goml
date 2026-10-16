@@ -1,0 +1,83 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value};
+use std::testing;
+
+#[test]
+fn floating_remainder_matches_ieee_boundary_answers() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    testing::assert_ok(
+        engine.register_filter(
+            "bits",
+            |value, _| match value {
+                Value::Float(number) => Result::Ok(Value::Text(number.to_bits().to_string())),
+                _ => Result::Err("expected float"),
+            },
+        ),
+    );
+    let cases: Vec[(u64, u64, u64)] = Vec::from_array(
+        [
+            (0x7fefffffffffffff, 0x0010000000000001, 0x0000000000060000),
+            (0xffefffffffffffff, 0x0010000000000001, 0x000ffffffffa0001),
+            (0x7fefffffffffffff, 0x8010000000000001, 0x800ffffffffa0001),
+            (0xffefffffffffffff, 0x8010000000000001, 0x8000000000060000),
+            (0x7fefffffffffffff, 0x000fffffffffffff, 0x0000000000020000),
+            (0xffefffffffffffff, 0x000fffffffffffff, 0x000ffffffffdffff),
+            (0x7fefffffffffffff, 0x800fffffffffffff, 0x800ffffffffdffff),
+            (0xffefffffffffffff, 0x800fffffffffffff, 0x8000000000020000),
+            (0x0010000000000000, 0x0000000000000003, 0x0000000000000001),
+            (0x8010000000000000, 0x0000000000000003, 0x0000000000000002),
+            (0x0010000000000000, 0x8000000000000003, 0x8000000000000002),
+            (0x8010000000000000, 0x8000000000000003, 0x8000000000000001),
+            (0x0010000000000001, 0x000fffffffffffff, 0x0000000000000002),
+            (0x8010000000000001, 0x000fffffffffffff, 0x000ffffffffffffd),
+            (0x0010000000000001, 0x800fffffffffffff, 0x800ffffffffffffd),
+            (0x8010000000000001, 0x800fffffffffffff, 0x8000000000000002),
+            (0x000fffffffffffff, 0x0007ffffffffffff, 0x0000000000000001),
+            (0x800fffffffffffff, 0x0007ffffffffffff, 0x0007fffffffffffe),
+            (0x000fffffffffffff, 0x8007ffffffffffff, 0x8007fffffffffffe),
+            (0x800fffffffffffff, 0x8007ffffffffffff, 0x8000000000000001),
+            (0x3ff0000000000001, 0x3fefffffffffffff, 0x3cb8000000000000),
+            (0xbff0000000000001, 0x3fefffffffffffff, 0x3feffffffffffffc),
+            (0x3ff0000000000001, 0xbfefffffffffffff, 0xbfeffffffffffffc),
+            (0xbff0000000000001, 0xbfefffffffffffff, 0xbcb8000000000000),
+            (0x7fefffffffffffff, 0x3ff0000000000001, 0x3ef8000000000000),
+            (0xffefffffffffffff, 0x3ff0000000000001, 0x3fefffd000000002),
+            (0x7fefffffffffffff, 0xbff0000000000001, 0xbfefffd000000002),
+            (0xffefffffffffffff, 0xbff0000000000001, 0xbef8000000000000),
+            (0x433fffffffffffff, 0x4008000000000000, 0x3ff0000000000000),
+            (0xc33fffffffffffff, 0x4008000000000000, 0x4000000000000000),
+            (0x433fffffffffffff, 0xc008000000000000, 0xc000000000000000),
+            (0xc33fffffffffffff, 0xc008000000000000, 0xbff0000000000000),
+            (0x0010000000000001, 0x7fefffffffffffff, 0x0010000000000001),
+            (0x8010000000000001, 0x7fefffffffffffff, 0x7fefffffffffffff),
+            (0x0010000000000001, 0xffefffffffffffff, 0xffefffffffffffff),
+            (0x8010000000000001, 0xffefffffffffffff, 0x8010000000000001),
+            (0x3ff0000000000000, 0x0000000000000001, 0x0000000000000000),
+            (0xbff0000000000000, 0x0000000000000001, 0x0000000000000000),
+            (0x3ff0000000000000, 0x8000000000000001, 0x8000000000000000),
+            (0xbff0000000000000, 0x8000000000000001, 0x8000000000000000),
+            (0x0000000000000000, 0x3ff0000000000000, 0x0000000000000000),
+            (0x8000000000000000, 0x3ff0000000000000, 0x0000000000000000),
+            (0x0000000000000000, 0xbff0000000000000, 0x8000000000000000),
+            (0x8000000000000000, 0xbff0000000000000, 0x8000000000000000),
+        ],
+    );
+    for (left, right, expected) in cases {
+        let context = Value::Object(
+            Vec::from_array(
+                [
+                    ("left", Value::Float(float64_from_bits(left))),
+                    ("right", Value::Float(float64_from_bits(right))),
+                ],
+            ),
+        );
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("{{ (left % right)|bits }}", context),
+                "remainder",
+            ),
+            expected.to_string(),
+        );
+    }
+}
