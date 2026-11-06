@@ -1,0 +1,84 @@
+package tests;
+
+use ecosystem::template::{Engine, Options, Value, Limits, ErrorKind};
+use std::testing;
+
+#[test]
+fn repeated_include_fallbacks_charge_each_candidate_before_loading() -> () {
+    let names = Vec::new();
+    for _ in 0..100 {
+        names.push(Value::Text("missing"));
+    }
+    let data = Value::Object(Vec::from_array([("names", Value::List(names))]));
+    let source = "{% include names ignore missing %}".repeat(10);
+    for maximum in[200, 2000] {
+        let engine = testing::expect_ok(
+            Engine::new(
+                Options {
+                    limits: Limits { max_steps: maximum, ..Limits::standard() },
+                    ..Options::standard(),
+                },
+            ),
+            "engine",
+        );
+        let calls = Ref::new(0);
+        engine.set_loader(
+            |_| {
+                calls.set(calls.get() + 1);
+                Result::Ok(Option::None)
+            },
+        );
+        let rendered = engine.render_string(source, data);
+        if maximum == 200 {
+            testing::assert_eq(
+                testing::expect_err(rendered, "include candidate budget").kind,
+                ErrorKind::Limit,
+            );
+            testing::assert(calls.get() > 0 && calls.get() < maximum);
+        } else {
+            testing::assert_eq(testing::expect_ok(rendered, "sufficient include budget"), "");
+            testing::assert_eq(calls.get(), 1000);
+        }
+        testing::assert_eq(
+            testing::expect_ok(
+                engine.render_string("after", Value::Object(Vec::new())),
+                "fresh render budget",
+            ),
+            "after",
+        );
+    }
+}
+
+#[test]
+fn include_candidate_accounting_preserves_first_success_and_missing_semantics() -> () {
+    let engine = testing::expect_ok(Engine::new(Options::standard()), "engine");
+    let calls = Ref::new(0);
+    engine.set_loader(
+        |name| {
+            calls.set(calls.get() + 1);
+            if name == "present" {
+                Result::Ok(Option::Some("found"))
+            } else {
+                Result::Ok(Option::None)
+            }
+        },
+    );
+    testing::assert_eq(
+        testing::expect_ok(
+            engine.render_string(
+                "{% include ['missing', 'present', 'later'] %}",
+                Value::Object(Vec::new()),
+            ),
+            "first existing candidate",
+        ),
+        "found",
+    );
+    testing::assert_eq(calls.get(), 2);
+    testing::assert_eq(
+        testing::expect_err(
+            engine.render_string("{% include ['missing'] %}", Value::Object(Vec::new())),
+            "missing template",
+        ).kind,
+        ErrorKind::MissingTemplate,
+    );
+}

@@ -301,7 +301,9 @@ failures retain their original location and add caller locations.
 
 Limits are configurable nonnegative integers. Nested context copies detect
 cycles by reaching the depth bound. Intermediate repetition, ranges, JSON
-emission and output accumulation check their respective limits. These are
+emission and output accumulation check their respective limits. Each include
+candidate consumes an operation before cache lookup or a loader callback;
+`ignore missing` does not suppress an exhausted operation budget. These are
 interpreter resource limits, not a process-wide memory cap or a deadline for
 registered application code.
 

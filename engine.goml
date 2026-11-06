@@ -371,6 +371,7 @@ impl Runtime {
             other => Vec::from_array([other]),
         };
         for value in names {
+            self.tick(source, offset, 0)?;
             let name = value.as_text().or_error(
                 || problem(source, offset, ErrorKind::Type, "include names must be strings"),
             )?;
